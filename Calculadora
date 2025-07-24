@@ -54,14 +54,16 @@ class Calculadora:
 
     # Teclas dos números
     def numero(self, n):
-        if self.expressao == '0':
+        if self.expressao == '0' or self.expressao[:4] == 'ERRO':
             self.expressao = n
         else:
             self.expressao += n
     
     # Tecla da vírgula
     def virgula(self):
-        if not self.expressao[-1].isdigit():
+        if self.expressao[:4] == 'ERRO':
+            self.expressao = '0,'
+        elif not self.expressao[-1].isdigit():
             return
         for caractere in reversed(self.expressao):
             if caractere == ',':
@@ -72,11 +74,15 @@ class Calculadora:
     
     # Teclas das operações
     def adicionar_operador(self, operador):
-        if self.expressao[-1] not in ('+', '-', 'x', '÷', ','):
+        if self.expressao[:4] == 'ERRO':
+            self.expressao = '0' + operador
+        elif self.expressao[-1] not in ('+', '-', 'x', '÷', ','):
             self.expressao += operador
     def porcentagem(self):
         numero = []
-        if self.expressao[-1] in ('+', '-', 'x', '÷', ','):
+        if self.expressao[:4] == 'ERRO':
+            self.expressao = '0,00'
+        elif self.expressao[-1] in ('+', '-', 'x', '÷', ','):
             return
         for caractere in reversed(self.expressao):
             if caractere.isdigit():
@@ -93,7 +99,9 @@ class Calculadora:
         nova_expressao = self.expressao[:-len(numero)] + resultado
         self.expressao = nova_expressao
     def igual(self):
-        if self.expressao[-1] in ('+', '-', 'x', '÷', ','):
+        if self.expressao[:4] == 'ERRO':
+            self.expressao = '0'
+        elif self.expressao[-1] in ('+', '-', 'x', '÷', ','):
             self.expressao = self.expressao[:-1]
         expressao_convertida = self.expressao.replace('x', '*').replace('÷', '/').replace(',', '.')
         try:
@@ -109,7 +117,9 @@ class Calculadora:
     def limpar(self):
         self.expressao = '0'
     def apagar(self):
-        if len(self.expressao) > 1:
+        if self.expressao[:4] == 'ERRO':
+            self.expressao = '0'
+        elif len(self.expressao) > 1:
             self.expressao = self.expressao[:-1]
         else:
             self.expressao = '0'
@@ -128,7 +138,7 @@ frame_painel.grid(column=0, row=0, sticky='nsew')
 frame_teclas = Frame(janela, width=200, height=250, bg=cor_teclas1)
 frame_teclas.grid(column=0, row=1)
 
-painel = Label(frame_painel, text='0', width=13, height=4, font=('Arial 32 bold'), bg=cor_fundo, fg=cor_painel, anchor='se', padx=19, pady=10)
+painel = Label(frame_painel, text='0', width=13, height=4, font=('Arial', 32, 'bold'), bg=cor_fundo, fg=cor_painel, anchor='se', padx=19, pady=10)
 painel.grid(column=0, row=0, sticky='nsew')
 
 # Expansão vertical do painel
@@ -191,7 +201,7 @@ tecla_adicao = Button(frame_teclas, text='+', command=lambda: c.adicionar_operad
 tecla_adicao.grid(column=3, row=3)
 
 # 5ª linha de teclas
-coelhinho_img = PhotoImage(file='C:\\Users\\mhrr_\\OneDrive\\Documentos\\MeusProjetos\\coelhinho.png') # Pixel art bonitinha para preencher espaço vazio e decorar a calculadora
+coelhinho_img = PhotoImage(file='C:\\Users\\mhrr_\\OneDrive\\Documentos\\Desenvolvimento\\Recursos\\coelhinho.png') # Pixel art bonitinha para preencher espaço vazio e decorar a calculadora
 label_coelhinho = Label(frame_teclas, image=coelhinho_img, bg=cor_teclas1)
 label_coelhinho.grid(column=0, row=4)
 
