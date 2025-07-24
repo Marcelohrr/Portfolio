@@ -1,0 +1,246 @@
+from tkinter import *
+from decimal import Decimal, getcontext
+
+# Precisão das operacões com Decimal
+getcontext().prec = 13
+
+# Cores
+cor_fundo = '#0d0623'
+cor_painel = '#FDFFDE'
+cor_teclas1 = '#06231c'
+cor_realce1 = '#d2efe8'
+cor_teclas2 = '#1EB08E'
+cor_realce2 = cor_teclas1
+cor_erro = '#781110'
+
+# Estilos
+estilo_teclas_1 = {
+    'width': 5,
+    'height': 2,
+    'font': ('Arial', 20, 'bold'),
+    'overrelief': 'ridge',
+    'bg': cor_teclas1,
+    'fg': cor_realce1
+}
+
+estilo_teclas_2 = {
+    'width': 5,
+    'height': 2,
+    'font': ('Arial', 20, 'bold'),
+    'overrelief': 'ridge',
+    'bg': cor_teclas2,
+    'fg': cor_realce2
+}
+
+# Lógica interna
+class Calculadora:
+    def __init__(self, painel):
+        self._painel = painel
+
+    # Teclas dos números
+    def zero(self):
+        if self._painel['text'] != '0':
+            self._painel['text'] += '0'
+    def um(self):
+        if self._painel['text'] == '0':
+            self._painel['text'] = '1'
+        else:
+            self._painel['text'] += '1'
+    def dois(self):
+        if self._painel['text'] == '0':
+            self._painel['text'] = '2'
+        else:
+            self._painel['text'] += '2'
+    def tres(self):
+        if self._painel['text'] == '0':
+            self._painel['text'] = '3'
+        else:
+            self._painel['text'] += '3'
+    def quatro(self):
+        if self._painel['text'] == '0':
+            self._painel['text'] = '4'
+        else:
+            self._painel['text'] += '4'
+    def cinco(self):
+        if self._painel['text'] == '0':
+            self._painel['text'] = '5'
+        else:
+            self._painel['text'] += '5'
+    def seis(self):
+        if self._painel['text'] == '0':
+            self._painel['text'] = '6'
+        else:
+            self._painel['text'] += '6'
+    def sete(self):
+        if self._painel['text'] == '0':
+            self._painel['text'] = '7'
+        else:
+            self._painel['text'] += '7'
+    def oito(self):
+        if self._painel['text'] == '0':
+            self._painel['text'] = '8'
+        else:
+            self._painel['text'] += '8'
+    def nove(self):
+        if self._painel['text'] == '0':
+            self._painel['text'] = '9'
+        else:
+            self._painel['text'] += '9'
+    
+    # Tecla da vírgula
+    def virgula(self):
+        if not self._painel['text'][-1].isdigit():
+            return
+        for caractere in reversed(self._painel['text']):
+            if caractere == ',':
+                return
+            elif caractere in ('+', '-', 'x', '÷'):
+                break
+        self._painel['text'] += ','
+    
+    # Teclas das operações
+    def adicao(self):
+        if self._painel['text'][-1] not in ('+', '-', 'x', '÷', ','):
+            self._painel['text'] += '+'
+    def subtracao(self):
+        if self._painel['text'][-1] not in ('+', '-', 'x', '÷', ','):
+            self._painel['text'] += '-'
+    def multiplicacao(self):
+        if self._painel['text'][-1] not in ('+', '-', 'x', '÷', ','):
+            self._painel['text'] += 'x'
+    def divisao(self):
+        if self._painel['text'][-1] not in ('+', '-', 'x', '÷', ','):
+            self._painel['text'] += '÷'
+    def porcentagem(self):
+        expressao = self._painel.cget('text')
+        numero = []
+        if expressao[-1] in ('+', '-', 'x', '÷', ','):
+            return
+        for caractere in reversed(expressao):
+            if caractere.isdigit():
+                numero.insert(0, caractere)
+            elif caractere == ',':
+                numero.insert(0, '.')
+            elif caractere in ('+', '-', 'x', '÷'):
+                break
+        if not numero:
+            return
+        resultado = Decimal(''.join(numero)) * Decimal('0.01')
+        resultado = format(resultado.normalize(), 'f')
+        resultado = resultado.replace('.', ',')
+        expressao = expressao[:-len(numero)] + resultado
+        self._painel.config(text=expressao)
+    def igual(self):
+        expressao = self._painel.cget('text')
+        if expressao[-1] in ('+', '-', 'x', '÷', ','):
+            expressao = expressao[:-1]
+        expressao = expressao.replace('x', '*').replace('÷', '/').replace(',', '.')
+        try:
+            resultado = Decimal(eval(expressao))
+            resultado = format(resultado.normalize(), 'f')
+            if '.' in resultado:
+                resultado = resultado.replace('.', ',')
+            self._painel.config(text=resultado)
+        except ZeroDivisionError:
+            self._painel.config(text='ERRO:\nDivisão por 0', fg=cor_erro)
+
+    # Teclas de apagar
+    def limpar(self):
+        self._painel['text'] = '0'
+    def apagar(self):
+        if len(self._painel['text']) > 1:
+            self._painel['text'] = self._painel['text'][:-1]
+        elif len(self._painel['text']) == 1:
+            self._painel['text'] = '0'
+
+# Criação e configuração da janela
+janela = Tk()
+janela.title('Calculadora')
+janela.resizable(False, True)
+janela.minsize(380, 441)
+janela.geometry('380x668+493+20')
+
+# Criação e configuração dos frames para o painel e para as teclas
+frame_painel = Frame(janela, bg=cor_fundo)
+frame_painel.grid(column=0, row=0, sticky='nsew')
+
+frame_teclas = Frame(janela, width=200, height=250, bg=cor_teclas1)
+frame_teclas.grid(column=0, row=1)
+
+painel = Label(frame_painel, text='0', width=13, height=4, font=('Arial 32 bold'), bg=cor_fundo, fg=cor_painel, anchor='se', padx=19, pady=10)
+painel.grid(column=0, row=0, sticky='nsew')
+
+# Expansão vertical do painel
+janela.grid_rowconfigure(0, weight=1)
+frame_painel.grid_rowconfigure(0, weight=1)
+
+# Criação da instância da Calculadora
+c = Calculadora(painel)
+
+# 1ª linha de teclas
+tecla_limpar = Button(frame_teclas, text='C', command=c.limpar, **estilo_teclas_2)
+tecla_limpar.grid(column=0, row=0)
+
+tecla_apagar = Button(frame_teclas, text='⌫', command=c.apagar, **estilo_teclas_2)
+tecla_apagar.grid(column=1, row=0)
+
+tecla_porcentagem = Button(frame_teclas, text='%', command=c.porcentagem, **estilo_teclas_2)
+tecla_porcentagem.grid(column=2, row=0)
+
+tecla_divisao = Button(frame_teclas, text='÷', command=c.divisao, **estilo_teclas_2)
+tecla_divisao.grid(column=3, row=0)
+
+# 2ª linha de teclas
+tecla_sete = Button(frame_teclas, text='7', command=c.sete, **estilo_teclas_1)
+tecla_sete.grid(column=0, row=1)
+
+tecla_oito = Button(frame_teclas, text='8', command=c.oito, **estilo_teclas_1)
+tecla_oito.grid(column=1, row=1)
+
+tecla_nove = Button(frame_teclas, text='9', command=c.nove, **estilo_teclas_1)
+tecla_nove.grid(column=2, row=1)
+
+tecla_multiplicacao = Button(frame_teclas, text='x', command=c.multiplicacao, **estilo_teclas_2)
+tecla_multiplicacao.grid(column=3, row=1)
+
+# 3ª linha de teclas
+tecla_quatro = Button(frame_teclas, text='4', command=c.quatro, **estilo_teclas_1)
+tecla_quatro.grid(column=0, row=2)
+
+tecla_cinco = Button(frame_teclas, text='5', command=c.cinco, **estilo_teclas_1)
+tecla_cinco.grid(column=1, row=2)
+
+tecla_seis = Button(frame_teclas, text='6', command=c.seis, **estilo_teclas_1)
+tecla_seis.grid(column=2, row=2)
+
+tecla_subtracao = Button(frame_teclas, text='-', command=c.subtracao, **estilo_teclas_2)
+tecla_subtracao.grid(column=3, row=2)
+
+# 4ª linha de teclas
+tecla_um = Button(frame_teclas, text='1', command=c.um, **estilo_teclas_1)
+tecla_um.grid(column=0, row=3)
+
+tecla_dois = Button(frame_teclas, text='2', command=c.dois, **estilo_teclas_1)
+tecla_dois.grid(column=1, row=3)
+
+tecla_tres = Button(frame_teclas, text='3', command=c.tres, **estilo_teclas_1)
+tecla_tres.grid(column=2, row=3)
+
+tecla_adicao = Button(frame_teclas, text='+', command=c.adicao, **estilo_teclas_2)
+tecla_adicao.grid(column=3, row=3)
+
+# 5ª linha de teclas
+coelhinho_img = PhotoImage(file='C:\\Users\\mhrr_\\OneDrive\\Documentos\\MeusProjetos\\coelhinho.png') # Pixel art bonitinha para preencher espaço vazio e decorar a calculadora
+label_coelhinho = Label(frame_teclas, image=coelhinho_img, bg=cor_teclas1)
+label_coelhinho.grid(column=0, row=4)
+
+tecla_zero = Button(frame_teclas, text='0', command=c.zero, **estilo_teclas_1)
+tecla_zero.grid(column=1, row=4)
+
+tecla_virgula = Button(frame_teclas, text=',', command=c.virgula, **estilo_teclas_1)
+tecla_virgula.grid(column=2, row=4)
+
+tecla_igual = Button(frame_teclas, text='=', command=c.igual, **estilo_teclas_2)
+tecla_igual.grid(column=3, row=4)
+
+janela.mainloop() # Mantém a janela aberta
