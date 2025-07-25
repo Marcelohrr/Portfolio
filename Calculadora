@@ -1,5 +1,6 @@
 from tkinter import *
 from decimal import Decimal, getcontext
+import re
 
 # Precisão das operacões com Decimal
 getcontext().prec = 13
@@ -43,14 +44,44 @@ class Calculadora:
     
     @expressao.setter
     def expressao(self, valor):
-        self._painel.config(text=valor)
+        exibicao_separadores = self._inserir_separadores(valor)
+        self._painel.config(text=exibicao_separadores)
         self._atualizar_cor(valor)
+        self._atualizar_tamanho(valor)
+    
+    # Métodos auxiliares do setter
+    def _inserir_separadores(self, valor):
+        if valor[:4] == 'ERRO':
+            return valor
+        partes_expressao = re.split(r'([+\-x÷])', valor) # r'' para não escapar \, para escapar - (igual a \\-), () para incluir operadores no resultado e [] para identificar cada operador separadamente
+        ultimo_numero = partes_expressao[-1]
+        if ultimo_numero != '': # Se o último valor no painel for um operador, ultimo_numero será ''
+            if ',' in ultimo_numero:
+                parte_inteira, parte_decimal = ultimo_numero.split(',')
+            else:
+                parte_inteira, parte_decimal = ultimo_numero, ''
+            parte_inteira = parte_inteira.replace('.', '')
+            parte_inteira = '{:,}'.format(int(parte_inteira)).replace(',', '.') # {} marcador de substituição
+            numero_formatado = parte_inteira + (',' + parte_decimal if ',' in ultimo_numero else '')
+            return ''.join(partes_expressao[:-1]) + numero_formatado
+        else:
+            return valor
 
-    def _atualizar_cor(self, valor): # Método auxiliar do setter
-        if valor == 'ERRO:\nDivisão por 0':
+    def _atualizar_cor(self, valor):
+        if valor[:4] == 'ERRO':
             self._painel.config(fg=cor_erro)
         else:
             self._painel.config(fg=cor_painel)
+    
+    def _atualizar_tamanho(self, valor):
+        tamanho = len(valor)
+        if tamanho < 15:
+            tamanho_fonte = 32
+        elif tamanho >= 20:
+            tamanho_fonte = 20
+        else:
+            tamanho_fonte = 32 - 2 * (tamanho - 15)
+        self._painel.config(font=('Arial', tamanho_fonte, 'bold'))
 
     # Teclas dos números
     def numero(self, n):
@@ -58,25 +89,23 @@ class Calculadora:
             self.expressao = n
         else:
             self.expressao += n
-    
+
     # Tecla da vírgula
     def virgula(self):
         if self.expressao[:4] == 'ERRO':
             self.expressao = '0,'
-        elif not self.expressao[-1].isdigit():
-            return
-        for caractere in reversed(self.expressao):
-            if caractere == ',':
-                return
-            elif caractere in ('+', '-', 'x', '÷'):
-                break
-        self.expressao += ','
-    
+        else:
+            ultimo_numero = re.split(r'([+\-x÷])', self.expressao)[-1]
+            if ',' not in ultimo_numero and ultimo_numero != '':
+                self.expressao += ','
+
     # Teclas das operações
     def adicionar_operador(self, operador):
         if self.expressao[:4] == 'ERRO':
             self.expressao = '0' + operador
-        elif self.expressao[-1] not in ('+', '-', 'x', '÷', ','):
+        elif self.expressao[-1] in ('+', '-', 'x', '÷'):
+            self.expressao = self.expressao[:-1] + operador
+        elif self.expressao[-1] != ',':
             self.expressao += operador
     def porcentagem(self):
         numero = []
@@ -94,8 +123,7 @@ class Calculadora:
         if not numero:
             return
         resultado = Decimal(''.join(numero)) * Decimal('0.01')
-        resultado = format(resultado.normalize(), 'f')
-        resultado = resultado.replace('.', ',')
+        resultado = format(resultado.normalize(), ',').replace(',', '#').replace('.', ',').replace('#', '.')
         nova_expressao = self.expressao[:-len(numero)] + resultado
         self.expressao = nova_expressao
     def igual(self):
@@ -138,11 +166,14 @@ frame_painel.grid(column=0, row=0, sticky='nsew')
 frame_teclas = Frame(janela, width=200, height=250, bg=cor_teclas1)
 frame_teclas.grid(column=0, row=1)
 
-painel = Label(frame_painel, text='0', width=13, height=4, font=('Arial', 32, 'bold'), bg=cor_fundo, fg=cor_painel, anchor='se', padx=19, pady=10)
+painel = Label(frame_painel, text='0', width=13, height=4, font=('Arial', 32, 'bold'), bg=cor_fundo, fg=cor_painel, anchor='se', justify='right', padx=19, pady=10)
 painel.grid(column=0, row=0, sticky='nsew')
 
-# Expansão vertical do painel
+# Controle vertical do painel
 janela.grid_rowconfigure(0, weight=1)
+
+# Configuração para permitir expansão horizontal e vertical do painel no grid
+frame_painel.grid_columnconfigure(0, weight=1)
 frame_painel.grid_rowconfigure(0, weight=1)
 
 # Criação da instância da Calculadora
@@ -201,7 +232,7 @@ tecla_adicao = Button(frame_teclas, text='+', command=lambda: c.adicionar_operad
 tecla_adicao.grid(column=3, row=3)
 
 # 5ª linha de teclas
-coelhinho_img = PhotoImage(file='C:\\Users\\mhrr_\\OneDrive\\Documentos\\Desenvolvimento\\Recursos\\coelhinho.png') # Pixel art bonitinha para preencher espaço vazio e decorar a calculadora
+coelhinho_img = PhotoImage(file='C:\\Users\\Marcelo Henrique\\OneDrive\\Documentos\\Desenvolvimento\\Recursos\\coelhinho.png') # Pixel art bonitinha para preencher espaço vazio e decorar a calculadora
 label_coelhinho = Label(frame_teclas, image=coelhinho_img, bg=cor_teclas1)
 label_coelhinho.grid(column=0, row=4)
 
