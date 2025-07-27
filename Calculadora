@@ -35,8 +35,12 @@ estilo_teclas_2 = {
 
 # Modelo: lógica interna
 class CalculadoraModel:
+    MAXIMO_CARACTERES = 15
+
     def __init__(self):
         self._expressao = ['0']
+        self._resultado_parcial = None
+        self._historico = []
     
     @property
     def expressao(self):
@@ -45,16 +49,48 @@ class CalculadoraModel:
     @expressao.setter
     def expressao(self, valor):
         self._expressao = valor
+    
+    @property
+    def resultado_parcial(self):
+        return self._resultado_parcial
+
+    @resultado_parcial.setter
+    def resultado_parcial(self, valor):
+        self._resultado_parcial = valor
+    
+    @property
+    def historico(self):
+        return self._historico
+
+    def calculo_parcial(self):
+        if self.expressao[0].startswith('ERRO'):
+            self.resultado_parcial = None
+            return
+        expressao_convertida = ''.join(self.expressao).replace('x', '*').replace('÷', '/').replace(',', '.')
+        if self.expressao[-1] in '+-x÷':
+            expressao_convertida = expressao_convertida[:-1]
+        try:
+            resultado = Decimal(eval(expressao_convertida))
+            self.resultado_parcial = resultado
+        except Exception:
+            self.resultado_parcial = None
+    
+    def adicionar_ao_historico(self, expressao_resultado):
+        self._historico.append(expressao_resultado)
 
     # Teclas dos números
     def adicionar_numero(self, n):
+        ultimo_numero = self.expressao[-1]
+        limite = self.MAXIMO_CARACTERES + 5 if ',' in ultimo_numero else self.MAXIMO_CARACTERES
+        if len(ultimo_numero) >= limite:
+            return
         if self.expressao == ['0'] or self.expressao[0].startswith('ERRO'):
             self.expressao = [n]
+        elif ultimo_numero not in '+-x÷':
+            self.expressao[-1] += n
         else:
-            if self.expressao[-1] not in '+-x÷':
-                self.expressao[-1] += n
-            else:
-                self.expressao.append(n)
+            self.expressao.append(n)
+        self.calculo_parcial()
 
     # Tecla da vírgula
     def adicionar_virgula(self):
@@ -66,7 +102,7 @@ class CalculadoraModel:
         else:
             self.expressao.append('0,')
 
-    # Teclas dos operações
+    # Teclas dos operadores
     def adicionar_operador(self, operador):
         if self.expressao[0].startswith('ERRO'):
             self.expressao = ['0', operador]
@@ -84,37 +120,52 @@ class CalculadoraModel:
             return
         ultimo_numero = self.expressao[-1].replace('.', '').replace(',', '.')
         resultado = Decimal(ultimo_numero) * Decimal('0.01')
-        resultado_formatado = format(resultado.normalize(), ',').replace(',', '#').replace('.', ',').replace('#', '.')
-        self.expressao[-1] = resultado_formatado
+        self.expressao[-1] = format(resultado.normalize(), 'f')
     def igual(self):
         if self.expressao[0].startswith('ERRO'):
             self.expressao = ['0']
+            self.resultado_parcial = None
             return
         elif self.expressao[-1] in '+-x÷,':
             self.expressao.pop()
-        expressao_convertida = ''.join(self.expressao).replace('x', '*').replace('÷', '/').replace(',', '.')
-        try:
-            resultado = Decimal(eval(expressao_convertida))
-            resultado_formatado = format(resultado.normalize(), 'f').replace('.', ',')
-            self.expressao = [resultado_formatado]
-        except ZeroDivisionError:
-            self.expressao = ['ERRO:\nDivisão por 0']
+        expressao_str = ''.join(self.expressao)
+        if self.resultado_parcial is not None:
+            resultado = format(self.resultado_parcial.normalize(), 'f')
+            self.expressao = [resultado]
+            self.resultado_parcial = None
+            self.adicionar_ao_historico((expressao_str, resultado)) # Tupla para guardar os dois valores
+        else:
+            expressao_convertida = expressao_str.replace('x', '*').replace('÷', '/').replace(',', '.')
+            try:
+                resultado = Decimal(eval(expressao_convertida))
+                resultado_str = format(resultado.normalize(), 'f')
+                self.expressao = [resultado_str]
+                self.adicionar_ao_historico((expressao_str, resultado_str))
+            except ZeroDivisionError:
+                self.expressao = ['ERRO:\nDivisão por 0']
+            self.resultado_parcial = None
 
     # Teclas de apagar
     def limpar(self):
         self.expressao = ['0']
+        self.resultado_parcial = None
     def apagar(self):
         if self.expressao[0].startswith('ERRO'):
             self.expressao = ['0']
+            self.resultado_parcial = None
         elif len(self.expressao[-1]) > 1:
             self.expressao[-1] = self.expressao[-1][:-1]
+            self.calculo_parcial()
         elif len(self.expressao) > 1:
             self.expressao.pop()
+            self.calculo_parcial()
         else:
             self.expressao = ['0']
+            self.resultado_parcial = None
+
 
 # Visão: interface gráfica com tkinter
-class CalculadoraView: # Interface gráfica com tkinter
+class CalculadoraView:
     def __init__(self, controller):
         self.controller = controller
         # Criação e configuração da janela
@@ -223,13 +274,14 @@ class CalculadoraView: # Interface gráfica com tkinter
             if token in '+-x÷':
                 resultado_formatado.append(token)
                 continue
-            if ',' in token:
-                parte_inteira, parte_decimal = token.split(',')
+            token_virgula = token.replace('.', ',')
+            if ',' in token_virgula:
+                parte_inteira, parte_decimal = token_virgula.split(',')
             else:
-                parte_inteira, parte_decimal = token, ''
-            parte_inteira = parte_inteira.replace('.', '')
-            parte_inteira_formatada = '{:,}'.format(int(parte_inteira)).replace(',', '.') # {} marcador de substituição
-            numero_formatado = parte_inteira_formatada + (',' + parte_decimal if ',' in token else '')
+                parte_inteira, parte_decimal = token_virgula, ''
+            parte_inteira_limpa = parte_inteira.replace('.', '')
+            parte_inteira_formatada = '{:,}'.format(int(parte_inteira_limpa)).replace(',', '.') # {} marcador de substituição
+            numero_formatado = parte_inteira_formatada + (',' + parte_decimal if ',' in token_virgula else '')
             resultado_formatado.append(numero_formatado)
         return ''.join(resultado_formatado)
 
