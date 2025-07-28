@@ -38,10 +38,10 @@ class CalculadoraModel:
     MAXIMO_CARACTERES = 15
 
     def __init__(self):
-        self._expressao = ['0']
-        self._resultado_parcial = None
-        self._historico = []
-    
+        self._expressao = ['0'] # Lista de strings, separando números e operadores
+        self._resultado_parcial = None # Decimal como resultado intermediário
+        self._historico = [] # Lista de tuplas com as strings [(expressão, resultado)]
+
     @property
     def expressao(self):
         return self._expressao
@@ -125,6 +125,7 @@ class CalculadoraModel:
         resultado = Decimal(token_convertido) * Decimal('0.01')
         resultado_str = format(resultado.normalize(), 'f')
         self.expressao[-1] = resultado_str
+        self.calculo_parcial()
     def igual(self):
         if self.expressao[0].startswith('ERRO'):
             self.expressao = ['0']
@@ -134,16 +135,22 @@ class CalculadoraModel:
             self.expressao.pop()
         expressao_str = ''.join(self.expressao)
         if self.resultado_parcial is not None:
-            resultado = format(self.resultado_parcial.normalize(), 'f')
-            self.expressao = [resultado]
+            resultado_str = format(self.resultado_parcial.normalize(), 'f')
+            if resultado_str.startswith('-'):
+                self.expressao = ['-', resultado_str[1:]]
+            else:
+                self.expressao = [resultado_str]
             self.resultado_parcial = None
-            self.adicionar_ao_historico((expressao_str, resultado)) # Tupla para guardar os dois valores
+            self.adicionar_ao_historico((expressao_str, resultado_str))
         else:
             expressao_convertida = expressao_str.replace('x', '*').replace('÷', '/').replace(',', '.')
             try:
                 resultado = Decimal(eval(expressao_convertida))
                 resultado_str = format(resultado.normalize(), 'f')
-                self.expressao = [resultado_str]
+                if resultado_str.startswith('-'):
+                    self.expressao = ['-', resultado_str[1:]]
+                else:
+                    self.expressao = [resultado_str]
                 self.adicionar_ao_historico((expressao_str, resultado_str))
             except ZeroDivisionError:
                 self.expressao = ['ERRO:\nDivisão por 0']
