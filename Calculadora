@@ -104,8 +104,10 @@ class CalculadoraModel:
 
     # Teclas dos operadores
     def adicionar_operador(self, operador):
-        if self.expressao[0].startswith('ERRO'):
+        if self.expressao[0].startswith('ERRO') or self.expressao == ['-']:
             self.expressao = ['0', operador]
+        elif operador == '-' and self.expressao == ['0']:
+            self.expressao = ['-']
         elif self.expressao[-1] in '+-x÷':
             self.expressao[-1] = operador
         elif not self.expressao[-1].endswith(','):
@@ -118,9 +120,11 @@ class CalculadoraModel:
             return
         elif self.expressao[-1] in '+-x÷,':
             return
-        ultimo_numero = self.expressao[-1].replace('.', '').replace(',', '.')
-        resultado = Decimal(ultimo_numero) * Decimal('0.01')
-        self.expressao[-1] = format(resultado.normalize(), 'f')
+        token = self.expressao[-1]
+        token_convertido = token.replace(',', '.')
+        resultado = Decimal(token_convertido) * Decimal('0.01')
+        resultado_str = format(resultado.normalize(), 'f')
+        self.expressao[-1] = resultado_str
     def igual(self):
         if self.expressao[0].startswith('ERRO'):
             self.expressao = ['0']
@@ -143,6 +147,8 @@ class CalculadoraModel:
                 self.adicionar_ao_historico((expressao_str, resultado_str))
             except ZeroDivisionError:
                 self.expressao = ['ERRO:\nDivisão por 0']
+            except:
+                self.expressao = ['0']
             self.resultado_parcial = None
 
     # Teclas de apagar
@@ -286,7 +292,7 @@ class CalculadoraView:
         return ''.join(resultado_formatado)
 
     def _atualizar_cor(self, valor):
-        if valor[0].startswith('ERRO'):
+        if valor.startswith('ERRO'):
             self._painel.config(fg=cor_erro)
         else:
             self._painel.config(fg=cor_painel)
