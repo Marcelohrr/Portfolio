@@ -7,7 +7,7 @@ getcontext().prec = 13
 
 # Cores
 cor_fundo = '#0d0623'
-cor_painel = '#FDFFDE'
+cor_expressao = '#FDFFDE'
 cor_teclas1 = '#06231c'
 cor_realce1 = '#d2efe8'
 cor_teclas2 = '#1EB08E'
@@ -35,12 +35,12 @@ estilo_teclas_2 = {
 
 # Modelo: lógica interna
 class CalculadoraModel:
-    MAXIMO_CARACTERES = 15
+    MAXIMO_CARACTERES_LINHA = 15
 
     def __init__(self):
         self._expressao = ['0'] # Lista de strings, separando números e operadores
         self._resultado_parcial = None # Decimal como resultado intermediário
-        self._historico = [] # Lista de tuplas com as strings [(expressão, resultado)]
+        self._historico = [] # Lista de tuplas [([expressão], resultado)]
 
     @property
     def expressao(self):
@@ -61,6 +61,10 @@ class CalculadoraModel:
     @property
     def historico(self):
         return self._historico
+    
+    @historico.setter
+    def historico(self, valor):
+        self._historico = valor
 
     def calculo_parcial(self):
         if self.expressao[0].startswith('ERRO'):
@@ -81,7 +85,7 @@ class CalculadoraModel:
     # Teclas dos números
     def adicionar_numero(self, n):
         ultimo_numero = self.expressao[-1]
-        limite = self.MAXIMO_CARACTERES + 5 if ',' in ultimo_numero else self.MAXIMO_CARACTERES
+        limite = self.MAXIMO_CARACTERES_LINHA + 5 if ',' in ultimo_numero else self.MAXIMO_CARACTERES_LINHA
         if len(ultimo_numero) >= limite:
             return
         if self.expressao == ['0'] or self.expressao[0].startswith('ERRO'):
@@ -126,6 +130,7 @@ class CalculadoraModel:
         resultado_str = format(resultado.normalize(), 'f')
         self.expressao[-1] = resultado_str
         self.calculo_parcial()
+    
     def igual(self):
         if self.expressao[0].startswith('ERRO'):
             self.expressao = ['0']
@@ -136,22 +141,22 @@ class CalculadoraModel:
         expressao_str = ''.join(self.expressao)
         if self.resultado_parcial is not None:
             resultado_str = format(self.resultado_parcial.normalize(), 'f')
+            self.adicionar_ao_historico((self.expressao.copy(), resultado_str))
             if resultado_str.startswith('-'):
                 self.expressao = ['-', resultado_str[1:]]
             else:
                 self.expressao = [resultado_str]
             self.resultado_parcial = None
-            self.adicionar_ao_historico((expressao_str, resultado_str))
         else:
             expressao_convertida = expressao_str.replace('x', '*').replace('÷', '/').replace(',', '.')
             try:
                 resultado = Decimal(eval(expressao_convertida))
                 resultado_str = format(resultado.normalize(), 'f')
+                self.adicionar_ao_historico((self.expressao.copy(), resultado_str))
                 if resultado_str.startswith('-'):
                     self.expressao = ['-', resultado_str[1:]]
                 else:
                     self.expressao = [resultado_str]
-                self.adicionar_ao_historico((expressao_str, resultado_str))
             except ZeroDivisionError:
                 self.expressao = ['ERRO:\nDivisão por 0']
             except:
@@ -160,8 +165,12 @@ class CalculadoraModel:
 
     # Teclas de apagar
     def limpar(self):
-        self.expressao = ['0']
+        if self.expressao != ['0']:
+            self.expressao = ['0']
+        else:
+            self.historico.clear()
         self.resultado_parcial = None
+    
     def apagar(self):
         if self.expressao[0].startswith('ERRO'):
             self.expressao = ['0']
@@ -176,38 +185,63 @@ class CalculadoraModel:
             self.expressao = ['0']
             self.resultado_parcial = None
 
-
 # Visão: interface gráfica com tkinter
 class CalculadoraView:
+    MAXIMO_CARACTERES_LINHA = 24
+
     def __init__(self, controller):
         self.controller = controller
-        # Criação e configuração da janela
+
+        # 1. Criação e configuração da janela
         self._janela = Tk()
         self._janela.title('Calculadora')
-        self._janela.resizable(False, True)
-        self._janela.minsize(380, 441)
-        self._janela.geometry('380x668+493+20')
+        self._janela.resizable(False, True) # Controla redimensionamento manual (horizontal, vertical)
+        self._janela.minsize(380, 441) # Tamanho mínimo da janela em pixels (largura, altura)
+        self._janela.geometry('380x668+493+20') # Tamanho e posição iniciais da janela (largura x altura + distância do canto esquerdo da tela até a janela + distância do topo da tela até a janela)
 
-        # Criação e configuração dos frames para o painel e para as teclas
-        frame_painel = Frame(self._janela, bg=cor_fundo)
-        frame_painel.grid(column=0, row=0, sticky='nsew')
+        # 1.1 Criação e configuração do Frame que agrupa a scrollbar e o Canvas
+        frame_painel_externo = Frame(self._janela, bg=cor_fundo)
+        frame_painel_externo.grid(column=0, row=0, sticky='nsew') # Faz o Frame expandir para preencher toda a área
 
+        # Scrollbar acoplada ao Frame, que permite rolar o conteúdo do Canvas
+        scrollbar = Scrollbar(frame_painel_externo)
+        scrollbar.pack(side=RIGHT, fill=Y)
+
+        # Área rolável que armazena o conteúdo
+        self._canvas = Canvas(frame_painel_externo, yscrollcommand=scrollbar.set, bg=cor_fundo, highlightthickness=0) # Cria o Canvas, o conecta com a Scrollbar (yscrollcommand=scrollbar.set) e remove sua borda padrão (highlightthickness=0)
+        self._canvas.pack(side=LEFT, fill=BOTH, expand=True) # fill=BOTH faz Canvas preencher totalmente os eixos X e Y (equivalente a sticky='nsew' no grid())
+        scrollbar.config(command=self._canvas.yview) # Faz o scroll da barra mover o Canvas verticalmente
+
+            # Frame interno, dentro do Canvas, que recebe o histórico, a expressão e o resultado parcial
+        self._frame_painel = Frame(self._canvas, bg=cor_fundo)
+        self._canvas.create_window((0, 0), window=self._frame_painel, anchor='se', tags='frame_painel_window') # Insere self._frame_painel no Canvas na posição (0, 0); anchor='se' ancora o Frame interno ao sul e ao leste, garante a atualização do scroll no limite inferior; nomeia essa janela interna para poder modificá-la
+        self._frame_painel.bind('<Configure>', lambda _: self._canvas.configure(scrollregion=self._canvas.bbox('all'))) # Atualiza automaticamente a área rolável ao redimensionar o frame_painel - .bind(evento, função) conecta um evento do widget a uma função (a função exige um argumento, no caso _, que serve como objeto do evento); '<Configure>' é um evento especial do Tkinter, disparado sempre que o widget é redimensionado; bbox = bounding box (self._canvas.bbox('all') retorna uma tupla com as coordenadas da área que contém todos os widgets internos do Canvas)
+
+        # Criação e configuração dos widgets no Frame painel (interno)
+            # Histórico
+        self._historico = Label(self._frame_painel, text='', font=('Arial', 18), bg=cor_fundo, fg=cor_expressao, anchor='e', justify='right')
+        self._historico.pack(fill=X, expand=False, pady=(10, 0), padx=10)
+
+            # Expressão atual
+        self._expressao = Label(self._frame_painel, text='0', font=('Arial', 32, 'bold'), bg=cor_fundo, fg=cor_expressao, anchor='e', justify='right')
+        self._expressao.pack(fill=X, expand=False, pady=(10, 0), padx=10)
+
+            # Resultado parcial
+        self._resultado_parcial = Label(self._frame_painel, text='', font=('Arial', 20), bg=cor_fundo, fg=cor_expressao, anchor='e', justify='right')
+        # Controle de pack dinâmico no método view.atualizar_resultado_parcial(self, resultado_parcial)
+
+        # 1.2 Criação e configuração do Frame das teclas
         frame_teclas = Frame(self._janela, width=200, height=250, bg=cor_teclas1)
         frame_teclas.grid(column=0, row=1)
 
-        self._painel = Label(frame_painel, text='0', width=13, height=4, font=('Arial', 32, 'bold'), bg=cor_fundo, fg=cor_painel, anchor='se', justify='right', padx=19, pady=10)
-        self._painel.grid(column=0, row=0, sticky='nsew')
-
-        # Controle vertical do painel
-        self._janela.grid_rowconfigure(0, weight=1)
-
-        # Configuração para permitir expansão horizontal e vertical do painel no grid
-        frame_painel.grid_columnconfigure(0, weight=1)
-        frame_painel.grid_rowconfigure(0, weight=1)
+        # Configuração da janela
+        self._janela.grid_rowconfigure(0, weight=1) # Permite que a linha 0 do grid (frame_painel_externo) se expanda verticalmente - importante para o redimensionamento da janela
+        self._janela.grid_columnconfigure(0, weight=1) # Permite que a linha 0 do grid (frame_painel_externo) se expanda horizontalmente - preserva a estrutura visual
+        self._janela.after(100, self._ajustar_scroll) # Executa view._ajustar_scroll 100ms após abrir a janela - garante que todos os widgets foram posicionados corretamente antes de ajustar o scroll
 
         # 1ª linha de teclas
-        tecla_limpar = Button(frame_teclas, text='C', command=self.controller.limpar, **estilo_teclas_2)
-        tecla_limpar.grid(column=0, row=0)
+        self._tecla_limpar = Button(frame_teclas, text='AC', command=self.controller.limpar, **estilo_teclas_2)
+        self._tecla_limpar.grid(column=0, row=0)
 
         tecla_apagar = Button(frame_teclas, text='⌫', command=self.controller.apagar, **estilo_teclas_2)
         tecla_apagar.grid(column=1, row=0)
@@ -271,14 +305,44 @@ class CalculadoraView:
 
         tecla_igual = Button(frame_teclas, text='=', command=self.controller.igual, **estilo_teclas_2)
         tecla_igual.grid(column=3, row=4)
-    
-    def atualizar_painel(self, valor):
-        valor_formatado = self._inserir_separadores(valor)
-        self._atualizar_cor(valor_formatado)
-        self._atualizar_tamanho(valor_formatado)
-        self._painel.config(text=valor_formatado)
 
-    # Métodos auxiliares de atualizar_painel
+    def _ajustar_scroll(self):
+        self._canvas.configure(scrollregion=self._canvas.bbox('all')) # Atualiza a área rolável como o tamanho total dos elementos no canvas
+        self._canvas.yview_moveto(1.0) # Em toda atualização, mantém o scroll no limite inferior
+        self._canvas.itemconfigure("frame_painel_window", width=self._canvas.winfo_width()) # Força a largura do conteúdo view._frame_painel a se adaptar dinamicamente à largura atual do Canvas
+
+    def atualizar_historico(self, historico):
+        historico_formatado = []
+        for expressao, resultado in historico:
+            expressao_formatada = self._inserir_separadores(expressao)
+            resultado_formatado = self._inserir_separadores([resultado])
+            historico_formatado.append(f'{expressao_formatada}\n= {resultado_formatado}')
+        exibicao_historico = '\n'.join(historico_formatado)
+        self._historico.config(text=exibicao_historico)
+        self._ajustar_scroll()
+
+    def atualizar_expressao(self, expressao):
+        expressao_formatada = self._inserir_separadores(expressao)
+        self._atualizar_cor(expressao_formatada)
+        self._atualizar_tamanho(expressao_formatada)
+        self._expressao.config(text=expressao_formatada)
+        self._ajustar_scroll()
+        if expressao == ['0']:
+            self._tecla_limpar.config(text='AC')
+        else:
+            self._tecla_limpar.config(text='C')
+
+    def atualizar_resultado_parcial(self, resultado_parcial):
+        if resultado_parcial is not None:
+            resultado_parcial_formatado = self._inserir_separadores([format(resultado_parcial.normalize(), 'f')])
+            self._resultado_parcial.config(text=resultado_parcial_formatado)
+            if not self._resultado_parcial.winfo_ismapped(): # Se o resultado parcial não estiver sendo exibido...
+                self._resultado_parcial.pack(fill=X, expand=False, pady=(0, 10), padx=10) # ...posiciona o widget no Frame
+        else:
+            if self._resultado_parcial.winfo_ismapped(): # Se o resultado parcial for None e estiver sendo exibido...
+                self._resultado_parcial.pack_forget() # ...remove o widget do Frame
+        self._ajustar_scroll()
+
     def _inserir_separadores(self, valor):
         if valor[0].startswith('ERRO'):
             return valor[0]
@@ -300,9 +364,9 @@ class CalculadoraView:
 
     def _atualizar_cor(self, valor):
         if valor.startswith('ERRO'):
-            self._painel.config(fg=cor_erro)
+            self._expressao.config(fg=cor_erro)
         else:
-            self._painel.config(fg=cor_painel)
+            self._expressao.config(fg=cor_expressao)
     
     def _atualizar_tamanho(self, valor):
         tamanho = len(valor)
@@ -312,7 +376,7 @@ class CalculadoraView:
             tamanho_fonte = 20
         else:
             tamanho_fonte = 32 - 2 * (tamanho - 15)
-        self._painel.config(font=('Arial', tamanho_fonte, 'bold'))
+        self._expressao.config(font=('Arial', tamanho_fonte, 'bold'))
 
     def iniciar_loop(self):
         self._janela.mainloop()
@@ -323,36 +387,49 @@ class CalculadoraController:
         self._model = model
         self.view = view
     
-    def _atualizar_view(self):
-        self.view.atualizar_painel(self._model.expressao)
+    def _atualizar_historico(self):
+        self.view.atualizar_historico(self._model.historico)
+
+    def _atualizar_expressao(self):
+        self.view.atualizar_expressao(self._model.expressao)
+    
+    def _atualizar_resultado_parcial(self):
+        self.view.atualizar_resultado_parcial(self._model.resultado_parcial)
 
     def adicionar_numero(self, n):
         self._model.adicionar_numero(n)
-        self._atualizar_view()
+        self._atualizar_expressao()
+        self._atualizar_resultado_parcial()
     
     def adicionar_virgula(self):
         self._model.adicionar_virgula()
-        self._atualizar_view()
+        self._atualizar_expressao()
 
     def adicionar_operador(self, operador):
         self._model.adicionar_operador(operador)
-        self._atualizar_view()
+        self._atualizar_expressao()
     
     def porcentagem(self):
         self._model.porcentagem()
-        self._atualizar_view()
+        self._atualizar_expressao()
+        self._atualizar_resultado_parcial()
     
     def igual(self):
         self._model.igual()
-        self._atualizar_view()
+        self._atualizar_expressao()
+        self._atualizar_historico()
+        self._atualizar_resultado_parcial()
     
     def limpar(self):
         self._model.limpar()
-        self._atualizar_view()
+        self._atualizar_expressao()
+        self._atualizar_historico()
+        self._atualizar_resultado_parcial()
 
     def apagar(self):
         self._model.apagar()
-        self._atualizar_view()
+        self._atualizar_expressao()
+        self._atualizar_resultado_parcial()
 
 # Função para criar as instâncias, conectá-las e iniciar o loop principal da interface gráfica
 def iniciar_calculadora():
