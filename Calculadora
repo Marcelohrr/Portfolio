@@ -209,25 +209,29 @@ class CalculadoraView:
 
         # Área rolável que armazena o conteúdo
         self._canvas = Canvas(frame_painel_externo, yscrollcommand=scrollbar.set, bg=cor_fundo, highlightthickness=0) # Cria o Canvas, o conecta com a Scrollbar (yscrollcommand=scrollbar.set) e remove sua borda padrão (highlightthickness=0)
-        self._canvas.pack(side=LEFT, fill=BOTH, expand=True) # fill=BOTH faz Canvas preencher totalmente os eixos X e Y (equivalente a sticky='nsew' no grid())
+        self._canvas.pack(side=LEFT, fill=BOTH) # fill=BOTH faz Canvas preencher totalmente os eixos X e Y (equivalente a sticky='nsew' no grid())
         scrollbar.config(command=self._canvas.yview) # Faz o scroll da barra mover o Canvas verticalmente
 
             # Frame interno, dentro do Canvas, que recebe o histórico, a expressão e o resultado parcial
         self._frame_painel = Frame(self._canvas, bg=cor_fundo)
-        self._canvas.create_window((0, 0), window=self._frame_painel, anchor='se', tags='frame_painel_window') # Insere self._frame_painel no Canvas na posição (0, 0); anchor='se' ancora o Frame interno ao sul e ao leste, garante a atualização do scroll no limite inferior; nomeia essa janela interna para poder modificá-la
+        self._canvas.create_window((0, 0), window=self._frame_painel, anchor='s', tags='frame_painel_window') # Insere self._frame_painel no Canvas na posição (0, 0); anchor='s' ancora o Frame interno ao sul, garantindo a atualização do scroll no limite inferior; nomeia essa janela interna para poder modificá-la
         self._frame_painel.bind('<Configure>', lambda _: self._canvas.configure(scrollregion=self._canvas.bbox('all'))) # Atualiza automaticamente a área rolável ao redimensionar o frame_painel - .bind(evento, função) conecta um evento do widget a uma função (a função exige um argumento, no caso _, que serve como objeto do evento); '<Configure>' é um evento especial do Tkinter, disparado sempre que o widget é redimensionado; bbox = bounding box (self._canvas.bbox('all') retorna uma tupla com as coordenadas da área que contém todos os widgets internos do Canvas)
+
+        # Espaçador invisível no topo do painel para empurrar o conteúdo para baixo
+        self._espacador_topo = Frame(self._frame_painel, bg=cor_fundo)
+        self._espacador_topo.pack(fill=X)
 
         # Criação e configuração dos widgets no Frame painel (interno)
             # Histórico
-        self._historico = Label(self._frame_painel, text='', font=('Arial', 18), bg=cor_fundo, fg=cor_expressao, anchor='e', justify='right')
-        self._historico.pack(fill=X, expand=False, pady=(10, 0), padx=10)
+        self._painel_historico = Label(self._frame_painel, text='', font=('Arial', 18), bg=cor_fundo, fg=cor_expressao, anchor='e', justify='right')
+        self._painel_historico.pack(fill=X, pady=(10, 0), padx=10)
 
             # Expressão atual
-        self._expressao = Label(self._frame_painel, text='0', font=('Arial', 32, 'bold'), bg=cor_fundo, fg=cor_expressao, anchor='e', justify='right')
-        self._expressao.pack(fill=X, expand=False, pady=(10, 0), padx=10)
+        self._painel_expressao = Label(self._frame_painel, text='0', font=('Arial', 32, 'bold'), bg=cor_fundo, fg=cor_expressao, anchor='e', justify='right')
+        self._painel_expressao.pack(fill=X, pady=(10, 0), padx=10)
 
             # Resultado parcial
-        self._resultado_parcial = Label(self._frame_painel, text='', font=('Arial', 20), bg=cor_fundo, fg=cor_expressao, anchor='e', justify='right')
+        self._painel_resultado_parcial = Label(self._frame_painel, text='', font=('Arial', 20), bg=cor_fundo, fg=cor_expressao, anchor='e', justify='right')
         # Controle de pack dinâmico no método view.atualizar_resultado_parcial(self, resultado_parcial)
 
         # 1.2 Criação e configuração do Frame das teclas
@@ -237,7 +241,7 @@ class CalculadoraView:
         # Configuração da janela
         self._janela.grid_rowconfigure(0, weight=1) # Permite que a linha 0 do grid (frame_painel_externo) se expanda verticalmente - importante para o redimensionamento da janela
         self._janela.grid_columnconfigure(0, weight=1) # Permite que a linha 0 do grid (frame_painel_externo) se expanda horizontalmente - preserva a estrutura visual
-        self._janela.after(100, self._ajustar_scroll) # Executa view._ajustar_scroll 100ms após abrir a janela - garante que todos os widgets foram posicionados corretamente antes de ajustar o scroll
+        self._janela.after(0, self._iniciar_scroll) # Agenda a execução para o próximo ciclo do loop de eventos - garante que todos os widgets foram posicionados corretamente antes de ajustar o scroll
 
         # 1ª linha de teclas
         self._tecla_limpar = Button(frame_teclas, text='AC', command=self.controller.limpar, **estilo_teclas_2)
@@ -306,10 +310,28 @@ class CalculadoraView:
         tecla_igual = Button(frame_teclas, text='=', command=self.controller.igual, **estilo_teclas_2)
         tecla_igual.grid(column=3, row=4)
 
+    def _iniciar_scroll(self): # Método para posicionar corretamente o Canvas e os widgets ao iniciar a Calculadora
+        if self._canvas.winfo_width() <= 1: # Canvas ainda não criado
+            self._janela.after(10, self._iniciar_scroll) # Tenta novamente em 10ms
+        else:
+            self._ajustar_scroll()
+
     def _ajustar_scroll(self):
+        self._janela.update_idletasks() # Força o processamento imediato das tarefas pendentes de atualização da interface gráfica que estão na fila de eventos
+        self._ajustar_espacador_topo()
         self._canvas.configure(scrollregion=self._canvas.bbox('all')) # Atualiza a área rolável como o tamanho total dos elementos no canvas
         self._canvas.yview_moveto(1.0) # Em toda atualização, mantém o scroll no limite inferior
-        self._canvas.itemconfigure("frame_painel_window", width=self._canvas.winfo_width()) # Força a largura do conteúdo view._frame_painel a se adaptar dinamicamente à largura atual do Canvas
+        self._canvas.itemconfigure('frame_painel_window', width=self._canvas.winfo_width()) # Força a largura do conteúdo view._frame_painel a se adaptar dinamicamente à largura atual do Canvas
+    
+    def _ajustar_espacador_topo(self):
+        altura_espacador = max(0, self._canvas.winfo_height() - self._frame_painel.winfo_reqheight()) # Define a altura do espaçador como o máximo entre 0 e a diferença da altura visível do Canvas e a altura total requisitada pelo painel interno
+        if altura_espacador <= 0: # Se o conteúdo for maior ou igual à tela visível...
+            if self._espacador_topo.winfo_ismapped():
+                self._espacador_topo.pack_forget() # ...remove o widget do Frame
+        else:
+            if not self._espacador_topo.winfo_ismapped(): # Se há espaço sobrando e o espaçador ainda não está exibido...
+                self._espacador_topo.pack(fill=X, before=self._painel_historico) # ...posiciona o widget no Frame acima do widget do histórico
+            self._espacador_topo.configure(height=altura_espacador) # Ajusta a altura do espaçador para empurrar o conteúdo visível para baixo
 
     def atualizar_historico(self, historico):
         historico_formatado = []
@@ -318,14 +340,14 @@ class CalculadoraView:
             resultado_formatado = self._inserir_separadores([resultado])
             historico_formatado.append(f'{expressao_formatada}\n= {resultado_formatado}')
         exibicao_historico = '\n'.join(historico_formatado)
-        self._historico.config(text=exibicao_historico)
+        self._painel_historico.config(text=exibicao_historico)
         self._ajustar_scroll()
 
     def atualizar_expressao(self, expressao):
         expressao_formatada = self._inserir_separadores(expressao)
         self._atualizar_cor(expressao_formatada)
         self._atualizar_tamanho(expressao_formatada)
-        self._expressao.config(text=expressao_formatada)
+        self._painel_expressao.config(text=expressao_formatada)
         self._ajustar_scroll()
         if expressao == ['0']:
             self._tecla_limpar.config(text='AC')
@@ -335,12 +357,12 @@ class CalculadoraView:
     def atualizar_resultado_parcial(self, resultado_parcial):
         if resultado_parcial is not None:
             resultado_parcial_formatado = self._inserir_separadores([format(resultado_parcial.normalize(), 'f')])
-            self._resultado_parcial.config(text=resultado_parcial_formatado)
-            if not self._resultado_parcial.winfo_ismapped(): # Se o resultado parcial não estiver sendo exibido...
-                self._resultado_parcial.pack(fill=X, expand=False, pady=(0, 10), padx=10) # ...posiciona o widget no Frame
+            self._painel_resultado_parcial.config(text=resultado_parcial_formatado)
+            if not self._painel_resultado_parcial.winfo_ismapped(): # Se o resultado parcial não estiver sendo exibido...
+                self._painel_resultado_parcial.pack(fill=X, pady=(0, 10), padx=10) # ...posiciona o widget no Frame
         else:
-            if self._resultado_parcial.winfo_ismapped(): # Se o resultado parcial for None e estiver sendo exibido...
-                self._resultado_parcial.pack_forget() # ...remove o widget do Frame
+            if self._painel_resultado_parcial.winfo_ismapped(): # Se o resultado parcial for None e estiver sendo exibido...
+                self._painel_resultado_parcial.pack_forget() # ...remove o widget do Frame
         self._ajustar_scroll()
 
     def _inserir_separadores(self, valor):
@@ -364,9 +386,9 @@ class CalculadoraView:
 
     def _atualizar_cor(self, valor):
         if valor.startswith('ERRO'):
-            self._expressao.config(fg=cor_erro)
+            self._painel_expressao.config(fg=cor_erro)
         else:
-            self._expressao.config(fg=cor_expressao)
+            self._painel_expressao.config(fg=cor_expressao)
     
     def _atualizar_tamanho(self, valor):
         tamanho = len(valor)
@@ -376,7 +398,7 @@ class CalculadoraView:
             tamanho_fonte = 20
         else:
             tamanho_fonte = 32 - 2 * (tamanho - 15)
-        self._expressao.config(font=('Arial', tamanho_fonte, 'bold'))
+        self._painel_expressao.config(font=('Arial', tamanho_fonte, 'bold'))
 
     def iniciar_loop(self):
         self._janela.mainloop()
