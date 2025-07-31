@@ -13,6 +13,7 @@ cor_realce1 = '#d2efe8'
 cor_teclas2 = '#1EB08E'
 cor_realce2 = cor_teclas1
 cor_erro = '#781110'
+cor_xuxu = '#BF60A5'
 
 # Estilos
 estilo_teclas_1 = {
@@ -38,9 +39,9 @@ class CalculadoraModel:
     MAXIMO_CARACTERES_LINHA = 15
 
     def __init__(self):
+        self._historico = [] # Lista de tuplas [([expressão], resultado)]
         self._expressao = ['0'] # Lista de strings, separando números e operadores
         self._resultado_parcial = None # Decimal como resultado intermediário
-        self._historico = [] # Lista de tuplas [([expressão], resultado)]
 
     @property
     def expressao(self):
@@ -67,7 +68,7 @@ class CalculadoraModel:
         self._historico = valor
 
     def calculo_parcial(self):
-        if self.expressao[0].startswith('ERRO'):
+        if self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('XUXU'):
             self.resultado_parcial = None
             return
         expressao_convertida = ''.join(self.expressao).replace('x', '*').replace('÷', '/').replace(',', '.')
@@ -88,7 +89,7 @@ class CalculadoraModel:
         limite = self.MAXIMO_CARACTERES_LINHA + 5 if ',' in ultimo_numero else self.MAXIMO_CARACTERES_LINHA
         if len(ultimo_numero) >= limite:
             return
-        if self.expressao == ['0'] or self.expressao[0].startswith('ERRO'):
+        if self.expressao == ['0'] or self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('XUXU'):
             self.expressao = [n]
         elif ultimo_numero not in '+-x÷':
             self.expressao[-1] += n
@@ -98,7 +99,7 @@ class CalculadoraModel:
 
     # Tecla da vírgula
     def adicionar_virgula(self):
-        if self.expressao[0].startswith('ERRO'):
+        if self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('XUXU'):
             self.expressao = ['0,']
         elif self.expressao[-1] not in '+-x÷':
             if ',' not in self.expressao[-1]:
@@ -108,7 +109,7 @@ class CalculadoraModel:
 
     # Teclas dos operadores
     def adicionar_operador(self, operador):
-        if self.expressao[0].startswith('ERRO') or self.expressao == ['-']:
+        if self.expressao[0].startswith('ERRO') or self.expressao == ['-'] or self.expressao[0].startswith('XUXU'):
             self.expressao = ['0', operador]
         elif operador == '-' and self.expressao == ['0']:
             self.expressao = ['-']
@@ -119,7 +120,7 @@ class CalculadoraModel:
     
     # Teclas das operações
     def porcentagem(self):
-        if self.expressao[0].startswith('ERRO'):
+        if self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('XUXU'):
             self.expressao = ['0']
             return
         elif self.expressao[-1] in '+-x÷,':
@@ -132,7 +133,7 @@ class CalculadoraModel:
         self.calculo_parcial()
     
     def igual(self):
-        if self.expressao[0].startswith('ERRO'):
+        if self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('XUXU'):
             self.expressao = ['0']
             self.resultado_parcial = None
             return
@@ -158,7 +159,7 @@ class CalculadoraModel:
                 else:
                     self.expressao = [resultado_str]
             except ZeroDivisionError:
-                self.expressao = ['ERRO:\nDivisão por 0']
+                self.expressao = ['ERRO: Divisão por 0']
             except:
                 self.expressao = ['0']
             self.resultado_parcial = None
@@ -172,7 +173,7 @@ class CalculadoraModel:
         self.resultado_parcial = None
     
     def apagar(self):
-        if self.expressao[0].startswith('ERRO'):
+        if self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('XUXU'):
             self.expressao = ['0']
             self.resultado_parcial = None
         elif len(self.expressao[-1]) > 1:
@@ -184,6 +185,11 @@ class CalculadoraModel:
         else:
             self.expressao = ['0']
             self.resultado_parcial = None
+
+    def xuxu(self):
+        self.expressao = ['XUXU, EU TE AMO!\n💖']
+        self._historico = []
+        self.resultado_parcial = None
 
 # Visão: interface gráfica com tkinter
 class CalculadoraView:
@@ -201,7 +207,7 @@ class CalculadoraView:
 
         # 1.1 Criação e configuração do Frame que agrupa a scrollbar e o Canvas
         frame_painel_externo = Frame(self._janela, bg=cor_fundo)
-        frame_painel_externo.grid(column=0, row=0, sticky='nsew') # Faz o Frame expandir para preencher toda a área
+        frame_painel_externo.grid(column=0, row=0, sticky='nsew') # sticky='nsew' faz o Frame expandir para preencher toda a área
 
         # Scrollbar acoplada ao Frame, que permite rolar o conteúdo do Canvas
         scrollbar = Scrollbar(frame_painel_externo)
@@ -215,7 +221,9 @@ class CalculadoraView:
             # Frame interno, dentro do Canvas, que recebe o histórico, a expressão e o resultado parcial
         self._frame_painel = Frame(self._canvas, bg=cor_fundo)
         self._canvas.create_window((0, 0), window=self._frame_painel, anchor='s', tags='frame_painel_window') # Insere self._frame_painel no Canvas na posição (0, 0); anchor='s' ancora o Frame interno ao sul, garantindo a atualização do scroll no limite inferior; nomeia essa janela interna para poder modificá-la
-        self._frame_painel.bind('<Configure>', lambda _: self._canvas.configure(scrollregion=self._canvas.bbox('all'))) # Atualiza automaticamente a área rolável ao redimensionar o frame_painel - .bind(evento, função) conecta um evento do widget a uma função (a função exige um argumento, no caso _, que serve como objeto do evento); '<Configure>' é um evento especial do Tkinter, disparado sempre que o widget é redimensionado; bbox = bounding box (self._canvas.bbox('all') retorna uma tupla com as coordenadas da área que contém todos os widgets internos do Canvas)
+        self._frame_painel.bind('<Configure>', lambda _: self._canvas.configure(scrollregion=self._canvas.bbox('all'))) # Atualiza automaticamente a área rolável ao redimensionar o frame_painel - bind(evento, função) conecta um evento do widget a uma função (a função exige um argumento, no caso _, que serve como objeto do evento); '<Configure>' é um evento especial do Tkinter, disparado sempre que o widget é redimensionado; bbox = bounding box (self._canvas.bbox('all') retorna uma tupla com as coordenadas da área que contém todos os widgets internos do Canvas)
+        self._ativar_scroll() # Configura o binding de eventos para rolar o Canvas no scroll do mouse
+        self._ativar_teclado() # Configura o binding de eventos do teclado
 
         # Espaçador invisível no topo do painel para empurrar o conteúdo para baixo
         self._espacador_topo = Frame(self._frame_painel, bg=cor_fundo)
@@ -333,6 +341,57 @@ class CalculadoraView:
                 self._espacador_topo.pack(fill=X, before=self._painel_historico) # ...posiciona o widget no Frame acima do widget do histórico
             self._espacador_topo.configure(height=altura_espacador) # Ajusta a altura do espaçador para empurrar o conteúdo visível para baixo
 
+    def _ativar_scroll(self):
+        def _ao_rolar(evento): # Handler de resposta aos eventos de scroll do mouse; o parâmetro evento é um objeto passado automaticamente pelo Tkinter, com informações fornecidas pelo sistema operacional (atributos que descrevem o evento): evento.delta (atributo para o valor do scroll no Windows/MacOS) e evento.num (atributo para o número do botão no Linux)
+            delta = 0 # Valor inicial neutro
+            if evento.num == 4:
+                delta = -1
+            elif evento.num == 5:
+                delta = 1
+            elif evento.delta:
+                delta = -1 * (evento.delta // 120) # evento.delta é múltiplo de 120 (representa os dentes do scroll do mouse, valores positivos rolam para cima e valores negativos rolam para baixo), então a expressão resulta na unidade rolada, com sinal invertido para seguir a convenção do Tkinter (scroll positivo rola para baixo e scroll negativo rola para cima)
+            if delta != 0:
+                self._canvas.yview_scroll(delta, 'units') # Rola o conteúdo verticalmente com os parâmetros: (unidades a rolar, tipo de rolagem)
+
+        self._canvas.bind_all('<MouseWheel>', _ao_rolar) # Windows/MacOS scroll
+        self._canvas.bind_all('<Button-4>', _ao_rolar) # Linux scroll up
+        self._canvas.bind_all('<Button-5>', _ao_rolar) # Linux scroll down
+
+    def _ativar_teclado(self):
+        def _ao_digitar(evento): # Handler de resposta aos eventos de tecla
+            if evento.keysym in ('Up', 'Down', 'Prior', 'Next', 'End'): # Caso para rolar com setas, Page Up/Down ou End
+                if evento.keysym == 'Up': # Tecla ↑
+                    self._canvas.yview_scroll(-1, 'units')
+                elif evento.keysym == 'Down': # Tecla ↓
+                    self._canvas.yview_scroll(1, 'units')
+                elif evento.keysym == 'Prior':  # Tecla Page Up
+                    self._canvas.yview_scroll(-1, 'pages')
+                elif evento.keysym == 'Next':  # Tecla Page Down
+                    self._canvas.yview_scroll(1, 'pages')
+                elif evento.keysym == 'End':
+                    self._canvas.yview_moveto(1.0)
+            # Continua as verificações do atributo keysym antes de verificar char
+            elif evento.keysym == 'Return': # Tecla Enter
+                self.controller.igual()
+            elif evento.keysym == 'Delete':
+                self.controller.limpar()
+            elif evento.keysym == 'BackSpace':
+                self.controller.apagar()
+            # Verificações do atributo char
+            elif evento.char: # Garante que char não é uma string vazia ('')
+                if evento.char in '0123456789':
+                    self.controller.adicionar_numero(evento.char)
+                elif evento.char in '.,':
+                    self.controller.adicionar_virgula()
+                elif evento.char in '+-*x/:':
+                    self.controller.adicionar_operador(evento.char)
+                elif evento.char == '%':
+                    self.controller.porcentagem()
+                elif evento.char == 'X':
+                    self.controller.xuxu()
+
+        self._janela.bind('<KeyPress>', _ao_digitar) # Os valores evento.keysym e evento.char funcionam de forma consistente no Tkinter em Windows, macOS e Linux
+
     def atualizar_historico(self, historico):
         historico_formatado = []
         for expressao, resultado in historico:
@@ -366,7 +425,7 @@ class CalculadoraView:
         self._ajustar_scroll()
 
     def _inserir_separadores(self, valor):
-        if valor[0].startswith('ERRO'):
+        if valor[0].startswith('ERRO') or valor[0].startswith('XUXU'):
             return valor[0]
         resultado_formatado = []
         for token in valor:
@@ -387,6 +446,8 @@ class CalculadoraView:
     def _atualizar_cor(self, valor):
         if valor.startswith('ERRO'):
             self._painel_expressao.config(fg=cor_erro)
+        elif valor.startswith('XUXU'):
+            self._painel_expressao.config(fg=cor_xuxu)
         else:
             self._painel_expressao.config(fg=cor_expressao)
     
@@ -428,7 +489,12 @@ class CalculadoraController:
         self._atualizar_expressao()
 
     def adicionar_operador(self, operador):
-        self._model.adicionar_operador(operador)
+        if operador == '*':
+            self._model.adicionar_operador('x')
+        elif operador in '/:':
+            self._model.adicionar_operador('÷')
+        else:
+            self._model.adicionar_operador(operador)
         self._atualizar_expressao()
     
     def porcentagem(self):
@@ -451,6 +517,12 @@ class CalculadoraController:
     def apagar(self):
         self._model.apagar()
         self._atualizar_expressao()
+        self._atualizar_resultado_parcial()
+    
+    def xuxu(self):
+        self._model.xuxu()
+        self._atualizar_expressao()
+        self._atualizar_historico()
         self._atualizar_resultado_parcial()
 
 # Função para criar as instâncias, conectá-las e iniciar o loop principal da interface gráfica
