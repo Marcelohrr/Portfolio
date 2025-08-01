@@ -36,7 +36,7 @@ estilo_teclas_2 = {
 
 # Modelo: lógica interna
 class CalculadoraModel:
-    MAXIMO_CARACTERES_LINHA = 15
+    MAXIMO_CARACTERES_NUMERO = 15
 
     def __init__(self):
         self._historico = [] # Lista de tuplas [([expressão], resultado)]
@@ -68,7 +68,7 @@ class CalculadoraModel:
         self._historico = valor
 
     def calculo_parcial(self):
-        if self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('XUXU'):
+        if self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('💖'):
             self.resultado_parcial = None
             return
         expressao_convertida = ''.join(self.expressao).replace('x', '*').replace('÷', '/').replace(',', '.')
@@ -85,21 +85,23 @@ class CalculadoraModel:
 
     # Teclas dos números
     def adicionar_numero(self, n):
-        ultimo_numero = self.expressao[-1]
-        limite = self.MAXIMO_CARACTERES_LINHA + 5 if ',' in ultimo_numero else self.MAXIMO_CARACTERES_LINHA
-        if len(ultimo_numero) >= limite:
-            return
-        if self.expressao == ['0'] or self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('XUXU'):
+        if self.expressao == ['0'] or self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('💖'):
             self.expressao = [n]
-        elif ultimo_numero not in '+-x÷':
-            self.expressao[-1] += n
         else:
-            self.expressao.append(n)
+            ultimo_numero = self.expressao[-1]
+            limite = self.MAXIMO_CARACTERES_NUMERO + 5 if ',' in ultimo_numero else self.MAXIMO_CARACTERES_NUMERO
+            if len(ultimo_numero) >= limite:
+                return
+            
+            elif ultimo_numero not in '+-x÷':
+                self.expressao[-1] += n
+            else:
+                self.expressao.append(n)
         self.calculo_parcial()
 
     # Tecla da vírgula
     def adicionar_virgula(self):
-        if self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('XUXU'):
+        if self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('💖'):
             self.expressao = ['0,']
         elif self.expressao[-1] not in '+-x÷':
             if ',' not in self.expressao[-1]:
@@ -109,7 +111,7 @@ class CalculadoraModel:
 
     # Teclas dos operadores
     def adicionar_operador(self, operador):
-        if self.expressao[0].startswith('ERRO') or self.expressao == ['-'] or self.expressao[0].startswith('XUXU'):
+        if self.expressao[0].startswith('ERRO') or self.expressao == ['-'] or self.expressao[0].startswith('💖'):
             self.expressao = ['0', operador]
         elif operador == '-' and self.expressao == ['0']:
             self.expressao = ['-']
@@ -120,7 +122,7 @@ class CalculadoraModel:
     
     # Teclas das operações
     def porcentagem(self):
-        if self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('XUXU'):
+        if self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('💖'):
             self.expressao = ['0']
             return
         elif self.expressao[-1] in '+-x÷,':
@@ -133,7 +135,7 @@ class CalculadoraModel:
         self.calculo_parcial()
     
     def igual(self):
-        if self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('XUXU'):
+        if self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('💖'):
             self.expressao = ['0']
             self.resultado_parcial = None
             return
@@ -173,7 +175,7 @@ class CalculadoraModel:
         self.resultado_parcial = None
     
     def apagar(self):
-        if self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('XUXU'):
+        if self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('💖'):
             self.expressao = ['0']
             self.resultado_parcial = None
         elif len(self.expressao[-1]) > 1:
@@ -187,13 +189,13 @@ class CalculadoraModel:
             self.resultado_parcial = None
 
     def xuxu(self):
-        self.expressao = ['XUXU, EU TE AMO!\n💖']
+        self.expressao = ['💖 XUXU, EU TE AMO! 💖']
         self._historico = []
         self.resultado_parcial = None
 
 # Visão: interface gráfica com tkinter
 class CalculadoraView:
-    MAXIMO_CARACTERES_LINHA = 24
+    MAXIMO_CARACTERES_LINHA = 20
 
     def __init__(self, controller):
         self.controller = controller
@@ -371,12 +373,12 @@ class CalculadoraView:
                 elif evento.keysym == 'End':
                     self._canvas.yview_moveto(1.0)
             # Continua as verificações do atributo keysym antes de verificar char
-            elif evento.keysym == 'Return': # Tecla Enter
-                self.controller.igual()
-            elif evento.keysym == 'Delete':
+            if evento.keysym == 'Delete':
                 self.controller.limpar()
             elif evento.keysym == 'BackSpace':
                 self.controller.apagar()
+            elif evento.keysym == 'Return' or evento.char == '=': # Tecla Enter ou =
+                self.controller.igual()
             # Verificações do atributo char
             elif evento.char: # Garante que char não é uma string vazia ('')
                 if evento.char in '0123456789':
@@ -396,22 +398,21 @@ class CalculadoraView:
         historico_formatado = []
         for expressao, resultado in historico:
             expressao_formatada = self._inserir_separadores(expressao)
-            resultado_formatado = self._inserir_separadores([resultado])
-            historico_formatado.append(f'{expressao_formatada}\n= {resultado_formatado}')
+            expressao_quebrada, _ = self._quebrar_em_linhas(expressao_formatada)
+            resultado_formatado = ''.join(self._inserir_separadores([resultado]))
+            historico_formatado.append(f'{expressao_quebrada}\n= {resultado_formatado}')
         exibicao_historico = '\n'.join(historico_formatado)
         self._painel_historico.config(text=exibicao_historico)
         self._ajustar_scroll()
 
     def atualizar_expressao(self, expressao):
         expressao_formatada = self._inserir_separadores(expressao)
-        self._atualizar_cor(expressao_formatada)
-        self._atualizar_tamanho(expressao_formatada)
-        self._painel_expressao.config(text=expressao_formatada)
+        expressao_quebrada, maior_linha = self._quebrar_em_linhas(expressao_formatada)
+        self._atualizar_tamanho(maior_linha)
+        self._atualizar_cor(expressao_quebrada)
+        self._painel_expressao.config(text=expressao_quebrada)
         self._ajustar_scroll()
-        if expressao == ['0']:
-            self._tecla_limpar.config(text='AC')
-        else:
-            self._tecla_limpar.config(text='C')
+        self._tecla_limpar.config(text='AC' if expressao == ['0'] else 'C')
 
     def atualizar_resultado_parcial(self, resultado_parcial):
         if resultado_parcial is not None:
@@ -425,7 +426,7 @@ class CalculadoraView:
         self._ajustar_scroll()
 
     def _inserir_separadores(self, valor):
-        if valor[0].startswith('ERRO') or valor[0].startswith('XUXU'):
+        if valor[0].startswith('ERRO') or valor[0].startswith('💖'):
             return valor[0]
         resultado_formatado = []
         for token in valor:
@@ -441,25 +442,39 @@ class CalculadoraView:
             parte_inteira_formatada = '{:,}'.format(int(parte_inteira_limpa)).replace(',', '.') # {} marcador de substituição
             numero_formatado = parte_inteira_formatada + (',' + parte_decimal if ',' in token_virgula else '')
             resultado_formatado.append(numero_formatado)
-        return ''.join(resultado_formatado)
-
+        return resultado_formatado
+    
+    def _quebrar_em_linhas(self, expressao): # Recebe uma lista de tokens e retorna a expressão quebrada em linhas
+        linhas = []
+        linha_atual = '' # String vazia que acumula os tokens até atingir o limite máximo
+        maior_linha = 0 # Variável para armazenar a quantidade de caracteres da maior linha, usada para ajustar o tamanho da fonte da expressão
+        for token in expressao:
+            if len(linha_atual) + len(token) > self.MAXIMO_CARACTERES_LINHA: # Se a junção do novo token ultrapassar o limite...
+                linhas.append(linha_atual) # ...salva a linha sem o token atual,
+                maior_linha = max(maior_linha, len(linha_atual)) # ...atualiza qual é a maior linha
+                linha_atual = '' # ...e reinicia a linha atual
+            linha_atual += token
+        if linha_atual: # Depois de percorrer todos os tokens, se ainda restou conteúdo em linha_atual...
+            linhas.append(linha_atual) # ...adiciona essa última linha à lista
+            maior_linha = max(maior_linha, len(linha_atual))
+        return '\n'.join(linhas), maior_linha # Retorna a expressão como uma string com quebras de linha e o comprimento da maior linha
+    
+    def _atualizar_tamanho(self, maior_linha):
+        if maior_linha < 13:
+            tamanho_fonte = 32
+        elif maior_linha >= 20:
+            tamanho_fonte = 20
+        else:
+            tamanho_fonte = 32 - 2 * (maior_linha - 13)
+        self._painel_expressao.config(font=('Arial', tamanho_fonte, 'bold'))
+    
     def _atualizar_cor(self, valor):
         if valor.startswith('ERRO'):
             self._painel_expressao.config(fg=cor_erro)
-        elif valor.startswith('XUXU'):
+        elif valor.startswith('💖'):
             self._painel_expressao.config(fg=cor_xuxu)
         else:
             self._painel_expressao.config(fg=cor_expressao)
-    
-    def _atualizar_tamanho(self, valor):
-        tamanho = len(valor)
-        if tamanho < 15:
-            tamanho_fonte = 32
-        elif tamanho >= 20:
-            tamanho_fonte = 20
-        else:
-            tamanho_fonte = 32 - 2 * (tamanho - 15)
-        self._painel_expressao.config(font=('Arial', tamanho_fonte, 'bold'))
 
     def iniciar_loop(self):
         self._janela.mainloop()
