@@ -7,7 +7,9 @@ getcontext().prec = 13
 
 # Cores
 cor_fundo = '#0d0623'
-cor_expressao = '#FDFFDE'
+cor_historico = '#4C5A8E'
+cor_expressao = '#FBEFBD'
+cor_resultado_parcial = '#584872'
 cor_teclas1 = '#06231c'
 cor_realce1 = '#d2efe8'
 cor_teclas2 = '#1EB08E'
@@ -67,7 +69,7 @@ class CalculadoraModel:
     def historico(self, valor):
         self._historico = valor
 
-    def calculo_parcial(self):
+    def _calculo_parcial(self):
         if self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('💖'):
             self.resultado_parcial = None
             return
@@ -80,7 +82,7 @@ class CalculadoraModel:
         except Exception:
             self.resultado_parcial = None
     
-    def adicionar_ao_historico(self, expressao_resultado):
+    def _adicionar_ao_historico(self, expressao_resultado):
         self._historico.append(expressao_resultado)
 
     # Teclas dos números
@@ -97,7 +99,7 @@ class CalculadoraModel:
                 self.expressao[-1] += n
             else:
                 self.expressao.append(n)
-        self.calculo_parcial()
+        self._calculo_parcial()
 
     # Tecla da vírgula
     def adicionar_virgula(self):
@@ -132,7 +134,7 @@ class CalculadoraModel:
         resultado = Decimal(token_convertido) * Decimal('0.01')
         resultado_str = format(resultado.normalize(), 'f')
         self.expressao[-1] = resultado_str
-        self.calculo_parcial()
+        self._calculo_parcial()
     
     def igual(self):
         if self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('💖'):
@@ -144,7 +146,7 @@ class CalculadoraModel:
         expressao_str = ''.join(self.expressao)
         if self.resultado_parcial is not None:
             resultado_str = format(self.resultado_parcial.normalize(), 'f')
-            self.adicionar_ao_historico((self.expressao.copy(), resultado_str))
+            self._adicionar_ao_historico((self.expressao.copy(), resultado_str))
             if resultado_str.startswith('-'):
                 self.expressao = ['-', resultado_str[1:]]
             else:
@@ -155,7 +157,7 @@ class CalculadoraModel:
             try:
                 resultado = Decimal(eval(expressao_convertida))
                 resultado_str = format(resultado.normalize(), 'f')
-                self.adicionar_ao_historico((self.expressao.copy(), resultado_str))
+                self._adicionar_ao_historico((self.expressao.copy(), resultado_str))
                 if resultado_str.startswith('-'):
                     self.expressao = ['-', resultado_str[1:]]
                 else:
@@ -180,10 +182,10 @@ class CalculadoraModel:
             self.resultado_parcial = None
         elif len(self.expressao[-1]) > 1:
             self.expressao[-1] = self.expressao[-1][:-1]
-            self.calculo_parcial()
+            self._calculo_parcial()
         elif len(self.expressao) > 1:
             self.expressao.pop()
-            self.calculo_parcial()
+            self._calculo_parcial()
         else:
             self.expressao = ['0']
             self.resultado_parcial = None
@@ -233,7 +235,7 @@ class CalculadoraView:
 
         # Criação e configuração dos widgets no Frame painel (interno)
             # Histórico
-        self._painel_historico = Label(self._frame_painel, text='', font=('Arial', 18), bg=cor_fundo, fg=cor_expressao, anchor='e', justify='right')
+        self._painel_historico = Label(self._frame_painel, text='', font=('Arial', 18), bg=cor_fundo, fg=cor_historico, anchor='e', justify='right')
         self._painel_historico.pack(fill=X, pady=(10, 0), padx=10)
 
             # Expressão atual
@@ -241,7 +243,7 @@ class CalculadoraView:
         self._painel_expressao.pack(fill=X, pady=(10, 0), padx=10)
 
             # Resultado parcial
-        self._painel_resultado_parcial = Label(self._frame_painel, text='', font=('Arial', 20), bg=cor_fundo, fg=cor_expressao, anchor='e', justify='right')
+        self._painel_resultado_parcial = Label(self._frame_painel, text='', font=('Arial', 20), bg=cor_fundo, fg=cor_resultado_parcial, anchor='e', justify='right')
         # Controle de pack dinâmico no método view.atualizar_resultado_parcial(self, resultado_parcial)
 
         # 1.2 Criação e configuração do Frame das teclas
@@ -405,9 +407,11 @@ class CalculadoraView:
         self._painel_historico.config(text=exibicao_historico)
         self._ajustar_scroll()
 
-    def atualizar_expressao(self, expressao):
+    def atualizar_expressao(self, expressao, view_mostrar_igual=False):
         expressao_formatada = self._inserir_separadores(expressao)
         expressao_quebrada, maior_linha = self._quebrar_em_linhas(expressao_formatada)
+        if view_mostrar_igual:
+            expressao_quebrada = f'= {expressao_quebrada}'
         self._atualizar_tamanho(maior_linha)
         self._atualizar_cor(expressao_quebrada)
         self._painel_expressao.config(text=expressao_quebrada)
@@ -416,7 +420,7 @@ class CalculadoraView:
 
     def atualizar_resultado_parcial(self, resultado_parcial):
         if resultado_parcial is not None:
-            resultado_parcial_formatado = self._inserir_separadores([format(resultado_parcial.normalize(), 'f')])
+            resultado_parcial_formatado = '= ' + ''.join(self._inserir_separadores([format(resultado_parcial.normalize(), 'f')]))
             self._painel_resultado_parcial.config(text=resultado_parcial_formatado)
             if not self._painel_resultado_parcial.winfo_ismapped(): # Se o resultado parcial não estiver sendo exibido...
                 self._painel_resultado_parcial.pack(fill=X, pady=(0, 10), padx=10) # ...posiciona o widget no Frame
@@ -488,8 +492,8 @@ class CalculadoraController:
     def _atualizar_historico(self):
         self.view.atualizar_historico(self._model.historico)
 
-    def _atualizar_expressao(self):
-        self.view.atualizar_expressao(self._model.expressao)
+    def _atualizar_expressao(self, controller_mostrar_igual=False):
+        self.view.atualizar_expressao(self._model.expressao, view_mostrar_igual=controller_mostrar_igual)
     
     def _atualizar_resultado_parcial(self):
         self.view.atualizar_resultado_parcial(self._model.resultado_parcial)
@@ -519,7 +523,7 @@ class CalculadoraController:
     
     def igual(self):
         self._model.igual()
-        self._atualizar_expressao()
+        self._atualizar_expressao(controller_mostrar_igual=True)
         self._atualizar_historico()
         self._atualizar_resultado_parcial()
     
