@@ -3,7 +3,7 @@ from decimal import Decimal, getcontext
 import os
 
 # Precisão das operacões com Decimal
-getcontext().prec = 13
+getcontext().prec = 100
 
 # Cores
 cor_fundo = '#0d0623'
@@ -39,6 +39,7 @@ estilo_teclas_2 = {
 # Modelo: lógica interna
 class CalculadoraModel:
     MAXIMO_CARACTERES_NUMERO = 15
+    MAXIMO_CARACTERES_DECIMAL = 20
 
     def __init__(self):
         self._historico = [] # Lista de tuplas [([expressão], resultado)]
@@ -78,10 +79,29 @@ class CalculadoraModel:
             expressao_convertida = expressao_convertida[:-1]
         try:
             resultado = Decimal(eval(expressao_convertida))
-            self.resultado_parcial = resultado
+            resultado_str = self._limitar_resultado(resultado)
+            self.resultado_parcial = Decimal(resultado_str)
         except Exception:
             self.resultado_parcial = None
     
+    def _limitar_resultado(self, valor_decimal):
+        valor_str = format(valor_decimal.normalize(), 'f') # resultado_str = format(resultado.normalize(), 'f')
+        if '.' in valor_str:
+            parte_inteira, parte_decimal = valor_str.split('.')
+            if len(parte_inteira) > self.MAXIMO_CARACTERES_NUMERO:
+                raise ValueError()
+            sobra_decimal = self.MAXIMO_CARACTERES_DECIMAL - len(parte_inteira) # Espaço restante para a parte decimal
+            if len(parte_decimal) > sobra_decimal: # Se a parte decimal ultrapassar o limite...
+                precisao = '1.' + '0' * sobra_decimal # ...concatena '1.' ao número de zeros depois da vírgula necessários para definir o valor fixo de precisão necessário para o método quantize(),
+                valor_aproximado = valor_decimal.quantize(Decimal(precisao)) #...aproxima o valor original
+                return str(valor_aproximado), True # ...e retorna a string do valor aproximado (incado por True)
+            else:
+                return valor_str, False
+        else:
+            if len(valor_str) > self.MAXIMO_CARACTERES_NUMERO:
+                raise ValueError()
+            return valor_str, False
+
     def _adicionar_ao_historico(self, expressao_resultado):
         self._historico.append(expressao_resultado)
 
@@ -91,10 +111,9 @@ class CalculadoraModel:
             self.expressao = [n]
         else:
             ultimo_numero = self.expressao[-1]
-            limite = self.MAXIMO_CARACTERES_NUMERO + 5 if ',' in ultimo_numero else self.MAXIMO_CARACTERES_NUMERO
+            limite = self.MAXIMO_CARACTERES_DECIMAL if ',' in ultimo_numero else self.MAXIMO_CARACTERES_NUMERO
             if len(ultimo_numero) >= limite:
                 return
-            
             elif ultimo_numero not in '+-x÷':
                 self.expressao[-1] += n
             else:
@@ -132,11 +151,12 @@ class CalculadoraModel:
         token = self.expressao[-1]
         token_convertido = token.replace(',', '.')
         resultado = Decimal(token_convertido) * Decimal('0.01')
-        resultado_str = format(resultado.normalize(), 'f')
+        resultado_str, _ = self._limitar_resultado(resultado)
         self.expressao[-1] = resultado_str
         self._calculo_parcial()
     
     def igual(self):
+        aproximado = False
         if self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('💖'):
             self.expressao = ['0']
             self.resultado_parcial = None
@@ -145,28 +165,36 @@ class CalculadoraModel:
             self.expressao.pop()
         expressao_str = ''.join(self.expressao)
         if self.resultado_parcial is not None:
-            resultado_str = format(self.resultado_parcial.normalize(), 'f')
-            self._adicionar_ao_historico((self.expressao.copy(), resultado_str))
-            if resultado_str.startswith('-'):
-                self.expressao = ['-', resultado_str[1:]]
-            else:
-                self.expressao = [resultado_str]
-            self.resultado_parcial = None
-        else:
-            expressao_convertida = expressao_str.replace('x', '*').replace('÷', '/').replace(',', '.')
             try:
-                resultado = Decimal(eval(expressao_convertida))
-                resultado_str = format(resultado.normalize(), 'f')
+                resultado_str, aproximado = self._limitar_resultado(self.resultado_parcial) # ValueError levantado ao ultrapassar limite de caracteres
+            except ValueError:
+                self.expressao = ['ERRO: Limite excedido']
+            else:
                 self._adicionar_ao_historico((self.expressao.copy(), resultado_str))
                 if resultado_str.startswith('-'):
                     self.expressao = ['-', resultado_str[1:]]
                 else:
                     self.expressao = [resultado_str]
+            self.resultado_parcial = None
+        else:
+            expressao_convertida = expressao_str.replace('x', '*').replace('÷', '/').replace(',', '.')
+            try:
+                resultado = Decimal(eval(expressao_convertida))
+                resultado_str, aproximado = self._limitar_resultado(resultado) # ValueError levantado ao ultrapassar limite de caracteres
             except ZeroDivisionError:
                 self.expressao = ['ERRO: Divisão por 0']
+            except ValueError:
+                self.expressao = ['ERRO: Limite excedido']
             except:
                 self.expressao = ['0']
+            else:
+                self._adicionar_ao_historico((self.expressao.copy(), resultado_str))
+                if resultado_str.startswith('-'):
+                    self.expressao = ['-', resultado_str[1:]]
+                else:
+                    self.expressao = [resultado_str]
             self.resultado_parcial = None
+        return aproximado
 
     # Teclas de apagar
     def limpar(self):
@@ -197,7 +225,7 @@ class CalculadoraModel:
 
 # Visão: interface gráfica com tkinter
 class CalculadoraView:
-    MAXIMO_CARACTERES_LINHA = 20
+    MAXIMO_CARACTERES_LINHA = 22
 
     def __init__(self, controller):
         self.controller = controller
@@ -407,11 +435,14 @@ class CalculadoraView:
         self._painel_historico.config(text=exibicao_historico)
         self._ajustar_scroll()
 
-    def atualizar_expressao(self, expressao, view_mostrar_igual=False):
+    def atualizar_expressao(self, expressao, view_mostrar_igual=False, view_aproximado=False):
         expressao_formatada = self._inserir_separadores(expressao)
         expressao_quebrada, maior_linha = self._quebrar_em_linhas(expressao_formatada)
-        if view_mostrar_igual:
-            expressao_quebrada = f'= {expressao_quebrada}'
+        if view_mostrar_igual and not expressao_quebrada.startswith('ERRO'):
+            if view_aproximado:
+                expressao_quebrada = f'≈ {expressao_quebrada}'
+            else:
+                expressao_quebrada = f'= {expressao_quebrada}'
         self._atualizar_tamanho(maior_linha)
         self._atualizar_cor(expressao_quebrada)
         self._painel_expressao.config(text=expressao_quebrada)
@@ -492,8 +523,8 @@ class CalculadoraController:
     def _atualizar_historico(self):
         self.view.atualizar_historico(self._model.historico)
 
-    def _atualizar_expressao(self, controller_mostrar_igual=False):
-        self.view.atualizar_expressao(self._model.expressao, view_mostrar_igual=controller_mostrar_igual)
+    def _atualizar_expressao(self, controller_mostrar_igual=False, controller_aproximado=False):
+        self.view.atualizar_expressao(self._model.expressao, view_mostrar_igual=controller_mostrar_igual, view_aproximado=controller_aproximado)
     
     def _atualizar_resultado_parcial(self):
         self.view.atualizar_resultado_parcial(self._model.resultado_parcial)
@@ -522,8 +553,8 @@ class CalculadoraController:
         self._atualizar_resultado_parcial()
     
     def igual(self):
-        self._model.igual()
-        self._atualizar_expressao(controller_mostrar_igual=True)
+        aproximado = self._model.igual() # Chama o método igual e captura o valor booleano de retorno que indica se o resultado foi aproximado (True) ou não (False)
+        self._atualizar_expressao(controller_mostrar_igual=True, controller_aproximado=aproximado)
         self._atualizar_historico()
         self._atualizar_resultado_parcial()
     
