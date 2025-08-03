@@ -1,9 +1,9 @@
-from tkinter import *
-from decimal import Decimal, getcontext
+import ast
+from decimal import Decimal, getcontext, InvalidOperation
+import operator
 import os
 
-# Precisão das operacões com Decimal
-getcontext().prec = 100
+from tkinter import *
 
 # Cores
 cor_fundo = '#0d0623'
@@ -35,6 +35,36 @@ estilo_teclas_2 = {
     'bg': cor_teclas2,
     'fg': cor_realce2
 }
+
+# Precisão das operacões com Decimal
+getcontext().prec = 50
+
+# Dicionário que mapeia cada operação do módulo ast para a função do módulo operator que executa essa operação
+_OPERADORES = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.USub: operator.neg,
+}
+
+# Função principal para a avaliação de expressões matemáticas
+def avaliar_expressao(expressao_str):
+    arvore = ast.parse(expressao_str, mode='eval') # parse é a função do módulo ast que recebe uma string de expressão e a converte em uma estrutura de dados AST usa o módulo ast (Abstract Syntax Tree) para criar uma árvore que representa a hierarquia de operações matemáticas; mode='eval' é o modo de parsing que indica que a string deve ser interpretada como uma expressão matemática que produz um valor
+    return _calcular_no(arvore.body) # arvore.body é o nó raiz da ast, hierarquicamente a última operação
+
+# Função que executa a operação correspondente a cada nó da árvore AST recursivamente, resolvendo as operações ordenadamente
+def _calcular_no(no):
+    if isinstance(no, ast.BinOp): # Verifica se o nó é uma operação binária (soma, subtração, multiplicação, divisão)
+        operador = _OPERADORES[type(no.op)] # Obtém a função correspondente ao operador
+        return operador(_calcular_no(no.left), _calcular_no(no.right)) # Chama recursivamente a função para calcular os dois lados da expressão adjacentes ao operador, com o operador a ser aplicado ao resultado dos dois valores
+    elif isinstance(no, ast.UnaryOp): # Verifica se o nó é uma operação unária (-x)
+        operador = _OPERADORES[type(no.op)]
+        return operador(_calcular_no(no.operand))
+    elif isinstance(no, ast.Constant): # Verifica se o nó é um valor constante (x)
+        return Decimal(str(no.value))
+    else:
+        raise TypeError(f'Nó inválido: {ast.dump(no)}')
 
 # Modelo: lógica interna
 class CalculadoraModel:
@@ -79,7 +109,7 @@ class CalculadoraModel:
         if self.expressao[-1] in '+-x÷':
             expressao_convertida = expressao_convertida[:-1]
         try:
-            resultado = Decimal(eval(expressao_convertida))
+            resultado = avaliar_expressao(expressao_convertida)
             resultado_str, self.resultado_aproximado = self._limitar_resultado(resultado)
             self.resultado_parcial = Decimal(resultado_str)
         except:
@@ -179,9 +209,9 @@ class CalculadoraModel:
         else:
             expressao_convertida = expressao_str.replace('x', '*').replace('÷', '/').replace(',', '.')
             try:
-                resultado = Decimal(eval(expressao_convertida))
+                resultado = avaliar_expressao(expressao_convertida)
                 resultado_str, _ = self._limitar_resultado(resultado) # ValueError levantado ao ultrapassar limite de caracteres
-            except ZeroDivisionError:
+            except (ZeroDivisionError, InvalidOperation):
                 self.expressao = ['ERRO: Divisão por 0']
             except ValueError:
                 self.expressao = ['ERRO: Limite excedido']
@@ -555,7 +585,7 @@ class CalculadoraController:
     def igual(self):
         aproximado = self._model.igual() # Chama o método igual e captura o valor booleano de retorno que indica se o resultado foi aproximado (True) ou não (False)
         self._atualizar_expressao(controller_mostrar_igual=True, controller_aproximado=aproximado)
-        self._model.resultado_aproximado = False
+        self._model.resultado_aproximado = False # Reset para evitar manter o sinal de aproximado em caso de = consecutivo
         self._atualizar_historico()
         self._atualizar_resultado_parcial()
     
