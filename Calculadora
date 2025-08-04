@@ -75,7 +75,8 @@ class CalculadoraModel:
         self._historico = [] # Lista de tuplas [([expressão], resultado)]
         self._expressao = ['0'] # Lista de strings, separando números e operadores
         self._resultado_parcial = None # Decimal como resultado intermediário
-        self.resultado_aproximado = False
+        self.resultado_aproximado = False # Atributo para verificar se o resultado foi aproximado em _calculo_parcial()
+        self.igual_pressionado = False # Atributo para verificar '=' consecutivos
 
     @property
     def expressao(self):
@@ -138,8 +139,9 @@ class CalculadoraModel:
 
     # Teclas dos números
     def adicionar_numero(self, n):
-        if self.expressao == ['0'] or self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('💖'):
+        if self.igual_pressionado or self.expressao == ['0'] or self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('💖'):
             self.expressao = [n]
+            self.igual_pressionado = False
         else:
             ultimo_numero = self.expressao[-1]
             limite = self.MAXIMO_CARACTERES_DECIMAL if ',' in ultimo_numero else self.MAXIMO_CARACTERES_NUMERO
@@ -153,6 +155,7 @@ class CalculadoraModel:
 
     # Tecla da vírgula
     def adicionar_virgula(self):
+        self.igual_pressionado = False
         if self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('💖'):
             self.expressao = ['0,']
         elif self.expressao[-1] not in '+-x÷':
@@ -163,6 +166,7 @@ class CalculadoraModel:
 
     # Teclas dos operadores
     def adicionar_operador(self, operador):
+        self.igual_pressionado = False
         if self.expressao[0].startswith('ERRO') or self.expressao == ['-'] or self.expressao[0].startswith('💖'):
             self.expressao = ['0', operador]
         elif operador == '-' and self.expressao == ['0']:
@@ -174,6 +178,7 @@ class CalculadoraModel:
     
     # Teclas das operações
     def porcentagem(self):
+        self.igual_pressionado = False
         if self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('💖'):
             self.expressao = ['0']
             return
@@ -187,6 +192,9 @@ class CalculadoraModel:
         self._calculo_parcial()
     
     def igual(self):
+        if self.igual_pressionado:
+            return
+        self.igual_pressionado = True
         if self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('💖'):
             self.expressao = ['0']
             self.resultado_parcial = None
@@ -228,6 +236,7 @@ class CalculadoraModel:
 
     # Teclas de apagar
     def limpar(self):
+        self.igual_pressionado = False
         if self.expressao != ['0']:
             self.expressao = ['0']
         else:
@@ -456,6 +465,12 @@ class CalculadoraView:
         self._janela.bind('<KeyPress>', _ao_digitar) # Os valores evento.keysym e evento.char funcionam de forma consistente no Tkinter em Windows, macOS e Linux
 
     def atualizar_historico(self, historico):
+        if not historico: # Se o histórico foi limpo no Model, limpa também o histórico no View
+            self._historico_formatado.clear()
+            self._painel_historico.config(text='')
+            return
+        if len(historico) == len(self._historico_formatado): # Se nada foi adicionado ao histórico, não faz nada
+            return
         expressao, resultado = historico[-1]
         expressao_formatada = self._inserir_separadores(expressao)
         expressao_quebrada, _ = self._quebrar_em_linhas(expressao_formatada)
@@ -583,11 +598,11 @@ class CalculadoraController:
         self._atualizar_resultado_parcial()
     
     def igual(self):
-        aproximado = self._model.igual() # Chama o método igual e captura o valor booleano de retorno que indica se o resultado foi aproximado (True) ou não (False)
-        self._atualizar_expressao(controller_mostrar_igual=True, controller_aproximado=aproximado)
-        self._model.resultado_aproximado = False # Reset para evitar manter o sinal de aproximado em caso de = consecutivo
-        self._atualizar_historico()
-        self._atualizar_resultado_parcial()
+        if self._model.igual_pressionado == False: # Evita atualização do painel com '=' consecutivos
+            aproximado = self._model.igual() # Chama o método igual e captura o valor booleano de retorno que indica se o resultado foi aproximado (True) ou não (False)
+            self._atualizar_expressao(controller_mostrar_igual=True, controller_aproximado=aproximado)
+            self._atualizar_historico()
+            self._atualizar_resultado_parcial()
     
     def limpar(self):
         self._model.limpar()
