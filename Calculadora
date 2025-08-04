@@ -295,6 +295,7 @@ class CalculadoraView:
             # Histórico
         self._painel_historico = Label(self._frame_painel, text='', font=('Arial', 18), bg=cor_fundo, fg=cor_historico, anchor='e', justify='right')
         self._painel_historico.pack(fill=X, pady=(10, 0), padx=10)
+        self._historico_formatado = []
 
             # Expressão atual
         self._painel_expressao = Label(self._frame_painel, text='0', font=('Arial', 32, 'bold'), bg=cor_fundo, fg=cor_expressao, anchor='e', justify='right')
@@ -455,13 +456,12 @@ class CalculadoraView:
         self._janela.bind('<KeyPress>', _ao_digitar) # Os valores evento.keysym e evento.char funcionam de forma consistente no Tkinter em Windows, macOS e Linux
 
     def atualizar_historico(self, historico):
-        historico_formatado = []
-        for expressao, resultado in historico:
-            expressao_formatada = self._inserir_separadores(expressao)
-            expressao_quebrada, _ = self._quebrar_em_linhas(expressao_formatada)
-            resultado_formatado = ''.join(self._inserir_separadores([resultado]))
-            historico_formatado.append(f'{expressao_quebrada}\n= {resultado_formatado}')
-        exibicao_historico = '\n'.join(historico_formatado)
+        expressao, resultado = historico[-1]
+        expressao_formatada = self._inserir_separadores(expressao)
+        expressao_quebrada, _ = self._quebrar_em_linhas(expressao_formatada)
+        resultado_formatado = ''.join(self._inserir_separadores([resultado]))
+        self._historico_formatado.append(f'{expressao_quebrada}\n= {resultado_formatado}')
+        exibicao_historico = '\n'.join(self._historico_formatado)
         self._painel_historico.config(text=exibicao_historico)
         self._ajustar_scroll()
 
