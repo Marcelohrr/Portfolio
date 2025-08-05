@@ -1,7 +1,6 @@
-import ast
-from decimal import Decimal, getcontext, InvalidOperation
-import operator
 import os
+import re # Módulo 'regular expression', usado na função avaliar_expressao() para transformar números na string da expressão em Decimal
+from decimal import Decimal, getcontext, InvalidOperation
 
 from tkinter import *
 from tkinter import ttk
@@ -41,32 +40,10 @@ estilo_teclas_2 = {
 # Precisão das operacões com Decimal
 getcontext().prec = 50
 
-# Dicionário que mapeia cada operação do módulo ast para a função do módulo operator que executa essa operação
-_OPERADORES = {
-    ast.Add: operator.add,
-    ast.Sub: operator.sub,
-    ast.Mult: operator.mul,
-    ast.Div: operator.truediv,
-    ast.USub: operator.neg,
-}
-
-# Função principal para a avaliação de expressões matemáticas
-def avaliar_expressao(expressao_str):
-    arvore = ast.parse(expressao_str, mode='eval') # parse é a função do módulo ast que recebe uma string de expressão e a converte em uma estrutura de dados AST usa o módulo ast (Abstract Syntax Tree) para criar uma árvore que representa a hierarquia de operações matemáticas; mode='eval' é o modo de parsing que indica que a string deve ser interpretada como uma expressão matemática que produz um valor
-    return _calcular_no(arvore.body) # arvore.body é o nó raiz da ast, hierarquicamente a última operação
-
-# Função que executa a operação correspondente a cada nó da árvore AST recursivamente, resolvendo as operações ordenadamente
-def _calcular_no(no):
-    if isinstance(no, ast.BinOp): # Verifica se o nó é uma operação binária (soma, subtração, multiplicação, divisão)
-        operador = _OPERADORES[type(no.op)] # Obtém a função correspondente ao operador
-        return operador(_calcular_no(no.left), _calcular_no(no.right)) # Chama recursivamente a função para calcular os dois lados da expressão adjacentes ao operador, com o operador a ser aplicado ao resultado dos dois valores
-    elif isinstance(no, ast.UnaryOp): # Verifica se o nó é uma operação unária (-x)
-        operador = _OPERADORES[type(no.op)]
-        return operador(_calcular_no(no.operand))
-    elif isinstance(no, ast.Constant): # Verifica se o nó é um valor constante (x)
-        return Decimal(str(no.value))
-    else:
-        raise TypeError(f'Nó inválido: {ast.dump(no)}')
+# Função para a avaliação de expressões matemáticas
+def avaliar_expressao(expressao_str): # Recebe a string com a expressão matemática pronta para ser calculada
+    expressao_convertida_decimal = re.sub(r'(\d+(\.\d+)?|\.\d+)', r"Decimal('\1')", expressao_str) # sub(padrão, substituição, string) substitui strings de números por Decimal (\1 é um placeholder para o texto capturado pelo primeiro grupo da expressão regular) através dos padrões: 1. um ou mais dígitos (\d+), com ou sem parte decimal ((\.\d+)); ou (|) 2. um ou mais dígitos apenas com parte decimal (\.\d+)
+    return eval(expressao_convertida_decimal, {'Decimal': Decimal}) # eval executa a string expressao_convertida_decimal como código Python, com o dicionário de ambiente (namespace) definido para usar a classe Decimal a cada ocorrência de Decimal('...'), retornando o resultado como Decimal
 
 # Modelo: lógica interna
 class CalculadoraModel:
@@ -110,11 +87,11 @@ class CalculadoraModel:
         if self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('💖'):
             self.resultado_parcial = None
             return
-        expressao_convertida = ''.join(self.expressao).replace('x', '*').replace('÷', '/').replace(',', '.')
+        expressao_para_avaliar = ''.join(self.expressao).replace('x', '*').replace('÷', '/').replace(',', '.')
         if self.expressao[-1] in '+-x÷':
-            expressao_convertida = expressao_convertida[:-1]
+            expressao_para_avaliar = expressao_para_avaliar[:-1]
         try:
-            resultado = avaliar_expressao(expressao_convertida)
+            resultado = avaliar_expressao(expressao_para_avaliar)
             resultado_str, self.resultado_aproximado, _ = self._limitar_resultado(resultado)
             self.resultado_parcial = Decimal(resultado_str)
         except Exception:
@@ -223,9 +200,9 @@ class CalculadoraModel:
                     self.expressao = [resultado_str]
             self.resultado_parcial = None
         else:
-            expressao_convertida = expressao_str.replace('x', '*').replace('÷', '/').replace(',', '.')
+            expressao_para_avaliar = expressao_str.replace('x', '*').replace('÷', '/').replace(',', '.')
             try:
-                resultado = avaliar_expressao(expressao_convertida)
+                resultado = avaliar_expressao(expressao_para_avaliar)
                 resultado_str, self.resultado_aproximado, _ = self._limitar_resultado(resultado) # ValueError levantado ao ultrapassar limite de caracteres
             except (ZeroDivisionError, InvalidOperation):
                 self.expressao = ['ERRO: Divisão por 0']
