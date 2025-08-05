@@ -77,8 +77,10 @@ class CalculadoraModel:
         self._historico = [] # Lista de tuplas [([expressão], resultado)]
         self._expressao = ['0'] # Lista de strings, separando números e operadores
         self._resultado_parcial = None # Decimal como resultado intermediário
+        
         self.resultado_aproximado = False # Atributo para verificar se o resultado foi aproximado em _calculo_parcial()
         self.igual_pressionado = False # Atributo para verificar '=' consecutivos
+        self._limite_decimal = False # Atributo para verificar limite de casas decimais
 
     @property
     def expressao(self):
@@ -113,9 +115,9 @@ class CalculadoraModel:
             expressao_convertida = expressao_convertida[:-1]
         try:
             resultado = avaliar_expressao(expressao_convertida)
-            resultado_str, self.resultado_aproximado = self._limitar_resultado(resultado)
+            resultado_str, self.resultado_aproximado, _ = self._limitar_resultado(resultado)
             self.resultado_parcial = Decimal(resultado_str)
-        except:
+        except Exception:
             self.resultado_parcial = None
     
     def _limitar_resultado(self, valor_decimal):
@@ -128,13 +130,13 @@ class CalculadoraModel:
             if len(parte_decimal) > sobra_decimal: # Se a parte decimal ultrapassar o limite...
                 precisao = '1.' + '0' * sobra_decimal # ...concatena '1.' ao número de zeros depois da vírgula necessários para definir o valor fixo de precisão necessário para o método quantize(),
                 valor_aproximado = valor_decimal.quantize(Decimal(precisao)) #...aproxima o valor original
-                return str(valor_aproximado), True # ...e retorna a string do valor aproximado (indicado por True)
+                return str(valor_aproximado), True, len(parte_decimal) # ...e retorna a string do valor aproximado (indicado por True)
             else:
-                return valor_str, False
+                return valor_str, False, len(parte_decimal)
         else:
             if len(valor_str) > self.MAXIMO_CARACTERES_NUMERO:
                 raise ValueError()
-            return valor_str, False
+            return valor_str, False, 0
 
     def _adicionar_ao_historico(self, expressao_resultado):
         self._historico.append(expressao_resultado)
@@ -189,8 +191,12 @@ class CalculadoraModel:
         token = self.expressao[-1]
         token_convertido = token.replace(',', '.')
         resultado = Decimal(token_convertido) * Decimal('0.01')
-        resultado_str, _ = self._limitar_resultado(resultado)
-        self.expressao[-1] = resultado_str
+        resultado_str, _, self._limite_decimal = self._limitar_resultado(resultado)
+        if self._limite_decimal >= 20:
+            self.expressao = ['ERRO: Limite excedido']
+            self.resultado_parcial = None
+        else:
+            self.expressao[-1] = resultado_str
         self._calculo_parcial()
     
     def igual(self):
@@ -206,7 +212,7 @@ class CalculadoraModel:
         expressao_str = ''.join(self.expressao)
         if self.resultado_parcial is not None:
             try:
-                resultado_str, _ = self._limitar_resultado(self.resultado_parcial) # ValueError levantado ao ultrapassar limite de caracteres
+                resultado_str, _, _ = self._limitar_resultado(self.resultado_parcial) # ValueError levantado ao ultrapassar limite de caracteres
             except ValueError:
                 self.expressao = ['ERRO: Limite excedido']
             else:
@@ -220,12 +226,12 @@ class CalculadoraModel:
             expressao_convertida = expressao_str.replace('x', '*').replace('÷', '/').replace(',', '.')
             try:
                 resultado = avaliar_expressao(expressao_convertida)
-                resultado_str, self.resultado_aproximado = self._limitar_resultado(resultado) # ValueError levantado ao ultrapassar limite de caracteres
+                resultado_str, self.resultado_aproximado, _ = self._limitar_resultado(resultado) # ValueError levantado ao ultrapassar limite de caracteres
             except (ZeroDivisionError, InvalidOperation):
                 self.expressao = ['ERRO: Divisão por 0']
             except ValueError:
                 self.expressao = ['ERRO: Limite excedido']
-            except:
+            except Exception:
                 self.expressao = ['0']
             else:
                 self._adicionar_ao_historico((self.expressao.copy(), resultado_str))
