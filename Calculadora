@@ -77,7 +77,7 @@ class CalculadoraModel:
         self._historico = [] # Lista de tuplas [([expressão], resultado)]
         self._expressao = ['0'] # Lista de strings, separando números e operadores
         self._resultado_parcial = None # Decimal como resultado intermediário
-        self._resultado_aproximado = False # Atributo para verificar se o resultado foi aproximado em _calculo_parcial()
+        self.resultado_aproximado = False # Atributo para verificar se o resultado foi aproximado em _calculo_parcial()
         self.igual_pressionado = False # Atributo para verificar '=' consecutivos
 
     @property
@@ -113,7 +113,7 @@ class CalculadoraModel:
             expressao_convertida = expressao_convertida[:-1]
         try:
             resultado = avaliar_expressao(expressao_convertida)
-            resultado_str, self._resultado_aproximado = self._limitar_resultado(resultado)
+            resultado_str, self.resultado_aproximado = self._limitar_resultado(resultado)
             self.resultado_parcial = Decimal(resultado_str)
         except:
             self.resultado_parcial = None
@@ -220,7 +220,7 @@ class CalculadoraModel:
             expressao_convertida = expressao_str.replace('x', '*').replace('÷', '/').replace(',', '.')
             try:
                 resultado = avaliar_expressao(expressao_convertida)
-                resultado_str, self._resultado_aproximado = self._limitar_resultado(resultado) # ValueError levantado ao ultrapassar limite de caracteres
+                resultado_str, self.resultado_aproximado = self._limitar_resultado(resultado) # ValueError levantado ao ultrapassar limite de caracteres
             except (ZeroDivisionError, InvalidOperation):
                 self.expressao = ['ERRO: Divisão por 0']
             except ValueError:
@@ -234,7 +234,6 @@ class CalculadoraModel:
                 else:
                     self.expressao = [resultado_str]
             self.resultado_parcial = None
-        return self._resultado_aproximado
 
     # Teclas de apagar
     def limpar(self):
@@ -517,9 +516,12 @@ class CalculadoraView:
         self._ajustar_scroll()
         self._tecla_limpar.config(text='AC' if expressao == ['0'] else 'C')
 
-    def atualizar_resultado_parcial(self, resultado_parcial):
+    def atualizar_resultado_parcial(self, resultado_parcial, view_aproximado=False):
         if resultado_parcial is not None:
-            resultado_parcial_formatado = '= ' + ''.join(self._inserir_separadores([format(resultado_parcial.normalize(), 'f')]))
+            if view_aproximado:
+                resultado_parcial_formatado = '≈ ' + ''.join(self._inserir_separadores([format(resultado_parcial.normalize(), 'f')]))
+            else:
+                resultado_parcial_formatado = '= ' + ''.join(self._inserir_separadores([format(resultado_parcial.normalize(), 'f')]))
             self._painel_resultado_parcial.config(text=resultado_parcial_formatado)
             if not self._painel_resultado_parcial.winfo_ismapped(): # Se o resultado parcial não estiver sendo exibido...
                 self._painel_resultado_parcial.pack(fill=X, pady=(0, 10), padx=10) # ...posiciona o widget no Frame
@@ -594,13 +596,13 @@ class CalculadoraController:
     def _atualizar_expressao(self, controller_mostrar_igual=False, controller_aproximado=False):
         self.view.atualizar_expressao(self._model.expressao, view_mostrar_igual=controller_mostrar_igual, view_aproximado=controller_aproximado)
     
-    def _atualizar_resultado_parcial(self):
-        self.view.atualizar_resultado_parcial(self._model.resultado_parcial)
+    def _atualizar_resultado_parcial(self, controller_aproximado=False):
+        self.view.atualizar_resultado_parcial(self._model.resultado_parcial, view_aproximado=controller_aproximado)
 
     def adicionar_numero(self, n):
         self._model.adicionar_numero(n)
         self._atualizar_expressao()
-        self._atualizar_resultado_parcial()
+        self._atualizar_resultado_parcial(self._model.resultado_aproximado)
     
     def adicionar_virgula(self):
         self._model.adicionar_virgula()
@@ -618,13 +620,13 @@ class CalculadoraController:
     def porcentagem(self):
         self._model.porcentagem()
         self._atualizar_expressao()
-        self._atualizar_resultado_parcial()
+        self._atualizar_resultado_parcial(self._model.resultado_aproximado)
     
     def igual(self):
         if self._model.igual_pressionado == False: # Evita atualização do painel com '=' consecutivos
-            aproximado = self._model.igual() # Chama o método igual e captura o valor booleano de retorno que indica se o resultado foi aproximado (True) ou não (False)
-            self._atualizar_expressao(controller_mostrar_igual=True, controller_aproximado=aproximado)
-            self._atualizar_historico(controller_aproximado=aproximado)
+            self._model.igual()
+            self._atualizar_expressao(controller_mostrar_igual=True, controller_aproximado=self._model.resultado_aproximado)
+            self._atualizar_historico(controller_aproximado=self._model.resultado_aproximado)
             self._atualizar_resultado_parcial()
     
     def limpar(self):
@@ -636,7 +638,7 @@ class CalculadoraController:
     def apagar(self):
         self._model.apagar()
         self._atualizar_expressao()
-        self._atualizar_resultado_parcial()
+        self._atualizar_resultado_parcial(self._model.resultado_aproximado)
     
     def xuxu(self):
         self._model.xuxu()
