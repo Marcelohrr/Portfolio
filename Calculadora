@@ -4,6 +4,7 @@ import operator
 import os
 
 from tkinter import *
+from tkinter import ttk
 
 # Cores
 cor_fundo = '#0d0623'
@@ -16,6 +17,7 @@ cor_teclas2 = '#1EB08E'
 cor_realce2 = cor_teclas1
 cor_erro = '#781110'
 cor_xuxu = '#BF60A5'
+cor_scrollbar = '#1E1E1E'
 
 # Estilos
 estilo_teclas_1 = {
@@ -117,7 +119,7 @@ class CalculadoraModel:
             self.resultado_parcial = None
     
     def _limitar_resultado(self, valor_decimal):
-        valor_str = format(valor_decimal.normalize(), 'f') # resultado_str = format(resultado.normalize(), 'f')
+        valor_str = format(valor_decimal.normalize(), 'f')
         if '.' in valor_str:
             parte_inteira, parte_decimal = valor_str.split('.')
             if len(parte_inteira) > self.MAXIMO_CARACTERES_NUMERO:
@@ -218,7 +220,7 @@ class CalculadoraModel:
             expressao_convertida = expressao_str.replace('x', '*').replace('÷', '/').replace(',', '.')
             try:
                 resultado = avaliar_expressao(expressao_convertida)
-                resultado_str, _ = self._limitar_resultado(resultado) # ValueError levantado ao ultrapassar limite de caracteres
+                resultado_str, self.resultado_aproximado = self._limitar_resultado(resultado) # ValueError levantado ao ultrapassar limite de caracteres
             except (ZeroDivisionError, InvalidOperation):
                 self.expressao = ['ERRO: Divisão por 0']
             except ValueError:
@@ -276,12 +278,30 @@ class CalculadoraView:
         self._janela.minsize(380, 441) # Tamanho mínimo da janela em pixels (largura, altura)
         self._janela.geometry('380x668+493+20') # Tamanho e posição iniciais da janela (largura x altura + distância do canto esquerdo da tela até a janela + distância do topo da tela até a janela)
 
+        # Estilo visual da Scrollbar personalizada (deve vir depois do Tk(), porque ttk.Style() precisa de um ambiente gráfico Tkinter já inicializado)
+        estilo_scrollbar = ttk.Style()
+        estilo_scrollbar.theme_use('clam')
+        estilo_scrollbar.configure('Vertical.TScrollbar',
+            gripcount=0,
+            background=cor_scrollbar, # Cor do 'thumb' (parte móvel)
+            darkcolor=cor_teclas2, # Cor da borda escura do thumb
+            lightcolor=cor_expressao, # Cor da borda clara do thumb
+            troughcolor=cor_fundo, # Cor do fundo fixo
+            bordercolor=cor_fundo, # Cor da borda externa da scrollbar
+            arrowcolor=cor_expressao # Cor das setas
+        )
+
+        estilo_scrollbar.map('Vertical.TScrollbar',
+            background=[('active', cor_expressao)],
+            arrowcolor=[('active', cor_erro)]
+        )
+
         # 1.1 Criação e configuração do Frame que agrupa a scrollbar e o Canvas
         frame_painel_externo = Frame(self._janela, bg=cor_fundo)
         frame_painel_externo.grid(column=0, row=0, sticky='nsew') # sticky='nsew' faz o Frame expandir para preencher toda a área
 
-        # Scrollbar acoplada ao Frame, que permite rolar o conteúdo do Canvas
-        scrollbar = Scrollbar(frame_painel_externo)
+        # Scrollbar acoplada ao Frame, que permite rolar o conteúdo do Canvas (estilizada com ttk)
+        scrollbar = ttk.Scrollbar(frame_painel_externo, orient='vertical', style='Vertical.TScrollbar')
         scrollbar.pack(side=RIGHT, fill=Y)
 
         # Área rolável que armazena o conteúdo
