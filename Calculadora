@@ -77,7 +77,7 @@ class CalculadoraModel:
         self._historico = [] # Lista de tuplas [([expressão], resultado)]
         self._expressao = ['0'] # Lista de strings, separando números e operadores
         self._resultado_parcial = None # Decimal como resultado intermediário
-        self.resultado_aproximado = False # Atributo para verificar se o resultado foi aproximado em _calculo_parcial()
+        self._resultado_aproximado = False # Atributo para verificar se o resultado foi aproximado em _calculo_parcial()
         self.igual_pressionado = False # Atributo para verificar '=' consecutivos
 
     @property
@@ -113,7 +113,7 @@ class CalculadoraModel:
             expressao_convertida = expressao_convertida[:-1]
         try:
             resultado = avaliar_expressao(expressao_convertida)
-            resultado_str, self.resultado_aproximado = self._limitar_resultado(resultado)
+            resultado_str, self._resultado_aproximado = self._limitar_resultado(resultado)
             self.resultado_parcial = Decimal(resultado_str)
         except:
             self.resultado_parcial = None
@@ -220,7 +220,7 @@ class CalculadoraModel:
             expressao_convertida = expressao_str.replace('x', '*').replace('÷', '/').replace(',', '.')
             try:
                 resultado = avaliar_expressao(expressao_convertida)
-                resultado_str, self.resultado_aproximado = self._limitar_resultado(resultado) # ValueError levantado ao ultrapassar limite de caracteres
+                resultado_str, self._resultado_aproximado = self._limitar_resultado(resultado) # ValueError levantado ao ultrapassar limite de caracteres
             except (ZeroDivisionError, InvalidOperation):
                 self.expressao = ['ERRO: Divisão por 0']
             except ValueError:
@@ -234,7 +234,7 @@ class CalculadoraModel:
                 else:
                     self.expressao = [resultado_str]
             self.resultado_parcial = None
-        return self.resultado_aproximado
+        return self._resultado_aproximado
 
     # Teclas de apagar
     def limpar(self):
@@ -484,7 +484,7 @@ class CalculadoraView:
 
         self._janela.bind('<KeyPress>', _ao_digitar) # Os valores evento.keysym e evento.char funcionam de forma consistente no Tkinter em Windows, macOS e Linux
 
-    def atualizar_historico(self, historico):
+    def atualizar_historico(self, historico, view_aproximado=False):
         if not historico: # Se o histórico foi limpo no Model, limpa também o histórico no View
             self._historico_formatado.clear()
             self._painel_historico.config(text='')
@@ -495,7 +495,10 @@ class CalculadoraView:
         expressao_formatada = self._inserir_separadores(expressao)
         expressao_quebrada, _ = self._quebrar_em_linhas(expressao_formatada)
         resultado_formatado = ''.join(self._inserir_separadores([resultado]))
-        self._historico_formatado.append(f'{expressao_quebrada}\n= {resultado_formatado}')
+        if view_aproximado:
+            self._historico_formatado.append(f'{expressao_quebrada}\n≈ {resultado_formatado}')
+        else:
+            self._historico_formatado.append(f'{expressao_quebrada}\n= {resultado_formatado}')
         exibicao_historico = '\n'.join(self._historico_formatado)
         self._painel_historico.config(text=exibicao_historico)
         self._ajustar_scroll()
@@ -585,8 +588,8 @@ class CalculadoraController:
         self._model = model
         self.view = view
     
-    def _atualizar_historico(self):
-        self.view.atualizar_historico(self._model.historico)
+    def _atualizar_historico(self, controller_aproximado=False):
+        self.view.atualizar_historico(self._model.historico, view_aproximado=controller_aproximado)
 
     def _atualizar_expressao(self, controller_mostrar_igual=False, controller_aproximado=False):
         self.view.atualizar_expressao(self._model.expressao, view_mostrar_igual=controller_mostrar_igual, view_aproximado=controller_aproximado)
@@ -621,7 +624,7 @@ class CalculadoraController:
         if self._model.igual_pressionado == False: # Evita atualização do painel com '=' consecutivos
             aproximado = self._model.igual() # Chama o método igual e captura o valor booleano de retorno que indica se o resultado foi aproximado (True) ou não (False)
             self._atualizar_expressao(controller_mostrar_igual=True, controller_aproximado=aproximado)
-            self._atualizar_historico()
+            self._atualizar_historico(controller_aproximado=aproximado)
             self._atualizar_resultado_parcial()
     
     def limpar(self):
