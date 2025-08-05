@@ -163,7 +163,7 @@ class CalculadoraModel:
         if self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('💖'):
             self.expressao = ['0,']
         elif self.expressao[-1] not in '+-x÷':
-            if ',' not in self.expressao[-1]:
+            if ',' not in self.expressao[-1] and '.' not in self.expressao[-1]: # Com =, o resultado fica armazenado no model com . ao invés de , como separador de decimais
                 self.expressao[-1] += ','
         else:
             self.expressao.append('0,')
