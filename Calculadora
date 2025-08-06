@@ -228,9 +228,10 @@ class CalculadoraModel:
         self.resultado_parcial = None
     
     def apagar(self):
-        if self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('💖'):
+        if self.igual_pressionado or self.expressao[0].startswith('ERRO') or self.expressao[0].startswith('💖'):
             self.expressao = ['0']
             self.resultado_parcial = None
+            self.igual_pressionado = False
         elif len(self.expressao[-1]) > 1:
             self.expressao[-1] = self.expressao[-1][:-1]
             self._calculo_parcial()
@@ -279,7 +280,7 @@ class CalculadoraView:
         )
 
         # 1.1 Criação e configuração do Frame que agrupa a scrollbar e o Canvas
-        frame_painel_externo = Frame(self._janela, bg=cor_fundo)
+        frame_painel_externo = Frame(self._janela)
         frame_painel_externo.grid(column=0, row=0, sticky='nsew') # sticky='nsew' faz o Frame expandir para preencher toda a área
 
         # Scrollbar acoplada ao Frame, que permite rolar o conteúdo do Canvas (estilizada com ttk)
@@ -293,7 +294,7 @@ class CalculadoraView:
 
             # Frame interno, dentro do Canvas, que recebe o histórico, a expressão e o resultado parcial
         self._frame_painel = Frame(self._canvas, bg=cor_fundo)
-        self._canvas.create_window((0, 0), window=self._frame_painel, anchor='s', tags='frame_painel_window') # Insere self._frame_painel no Canvas na posição (0, 0); anchor='s' ancora o Frame interno ao sul, garantindo a atualização do scroll no limite inferior; nomeia essa janela interna para poder modificá-la
+        self._canvas.create_window((0, 0), window=self._frame_painel, tags='frame_painel_window') # Insere self._frame_painel no Canvas na posição (0, 0); nomeia essa janela interna para poder modificá-la
         self._frame_painel.bind('<Configure>', lambda _: self._canvas.configure(scrollregion=self._canvas.bbox('all'))) # Atualiza automaticamente a área rolável ao redimensionar o frame_painel - bind(evento, função) conecta um evento do widget a uma função (a função exige um argumento, no caso _, que serve como objeto do evento); '<Configure>' é um evento especial do Tkinter, disparado sempre que o widget é redimensionado; bbox = bounding box (self._canvas.bbox('all') retorna uma tupla com as coordenadas da área que contém todos os widgets internos do Canvas)
         self._ativar_scroll() # Configura o binding de eventos para rolar o Canvas no scroll do mouse
         self._ativar_teclado() # Configura o binding de eventos do teclado
@@ -317,80 +318,105 @@ class CalculadoraView:
         # Controle de pack dinâmico no método view.atualizar_resultado_parcial(self, resultado_parcial)
 
         # 1.2 Criação e configuração do Frame das teclas
-        frame_teclas = Frame(self._janela, width=200, height=250, bg=cor_teclas1)
-        frame_teclas.grid(column=0, row=1)
+        self._frame_teclas = Frame(self._janela, width=200, height=250, bg=cor_teclas1)
+        self._frame_teclas.grid(column=0, row=1)
 
         # Configuração da janela
         self._janela.grid_rowconfigure(0, weight=1) # Permite que a linha 0 do grid (frame_painel_externo) se expanda verticalmente - importante para o redimensionamento da janela
         self._janela.grid_columnconfigure(0, weight=1) # Permite que a linha 0 do grid (frame_painel_externo) se expanda horizontalmente - preserva a estrutura visual
         self._janela.after(0, self._iniciar_scroll) # Agenda a execução para o próximo ciclo do loop de eventos - garante que todos os widgets foram posicionados corretamente antes de ajustar o scroll
 
+        # Listas que armazenam referências aos botões para atualizar cores com o modo xuxu
+        self._botoes_teclas_1 = []
+        self._botoes_teclas_2 = []
+
         # 1ª linha de teclas
-        self._tecla_limpar = Button(frame_teclas, text='AC', command=self.controller.limpar, **estilo_teclas_2)
+        self._tecla_limpar = Button(self._frame_teclas, text='AC', command=self.controller.limpar, **estilo_teclas_2)
         self._tecla_limpar.grid(column=0, row=0)
+        self._botoes_teclas_2.append(self._tecla_limpar)
 
-        tecla_apagar = Button(frame_teclas, text='⌫', command=self.controller.apagar, **estilo_teclas_2)
+        tecla_apagar = Button(self._frame_teclas, text='⌫', command=self.controller.apagar, **estilo_teclas_2)
         tecla_apagar.grid(column=1, row=0)
+        self._botoes_teclas_2.append(tecla_apagar)
 
-        tecla_porcentagem = Button(frame_teclas, text='%', command=self.controller.porcentagem, **estilo_teclas_2)
+        tecla_porcentagem = Button(self._frame_teclas, text='%', command=self.controller.porcentagem, **estilo_teclas_2)
         tecla_porcentagem.grid(column=2, row=0)
+        self._botoes_teclas_2.append(tecla_porcentagem)
 
-        tecla_divisao = Button(frame_teclas, text='÷', command=lambda: self.controller.adicionar_operador('÷'), **estilo_teclas_2)
+        tecla_divisao = Button(self._frame_teclas, text='÷', command=lambda: self.controller.adicionar_operador('÷'), **estilo_teclas_2)
         tecla_divisao.grid(column=3, row=0)
+        self._botoes_teclas_2.append(tecla_divisao)
 
         # 2ª linha de teclas
-        tecla_sete = Button(frame_teclas, text='7', command=lambda: self.controller.adicionar_numero('7'), **estilo_teclas_1)
+        tecla_sete = Button(self._frame_teclas, text='7', command=lambda: self.controller.adicionar_numero('7'), **estilo_teclas_1)
         tecla_sete.grid(column=0, row=1)
+        self._botoes_teclas_1.append(tecla_sete)
 
-        tecla_oito = Button(frame_teclas, text='8', command=lambda: self.controller.adicionar_numero('8'), **estilo_teclas_1)
+        tecla_oito = Button(self._frame_teclas, text='8', command=lambda: self.controller.adicionar_numero('8'), **estilo_teclas_1)
         tecla_oito.grid(column=1, row=1)
+        self._botoes_teclas_1.append(tecla_oito)
 
-        tecla_nove = Button(frame_teclas, text='9', command=lambda: self.controller.adicionar_numero('9'), **estilo_teclas_1)
+        tecla_nove = Button(self._frame_teclas, text='9', command=lambda: self.controller.adicionar_numero('9'), **estilo_teclas_1)
         tecla_nove.grid(column=2, row=1)
+        self._botoes_teclas_1.append(tecla_nove)
 
-        tecla_multiplicacao = Button(frame_teclas, text='x', command=lambda: self.controller.adicionar_operador('x'), **estilo_teclas_2)
+        tecla_multiplicacao = Button(self._frame_teclas, text='x', command=lambda: self.controller.adicionar_operador('x'), **estilo_teclas_2)
         tecla_multiplicacao.grid(column=3, row=1)
+        self._botoes_teclas_2.append(tecla_multiplicacao)
 
         # 3ª linha de teclas
-        tecla_quatro = Button(frame_teclas, text='4', command=lambda: self.controller.adicionar_numero('4'), **estilo_teclas_1)
+        tecla_quatro = Button(self._frame_teclas, text='4', command=lambda: self.controller.adicionar_numero('4'), **estilo_teclas_1)
         tecla_quatro.grid(column=0, row=2)
+        self._botoes_teclas_1.append(tecla_quatro)
 
-        tecla_cinco = Button(frame_teclas, text='5', command=lambda: self.controller.adicionar_numero('5'), **estilo_teclas_1)
+        tecla_cinco = Button(self._frame_teclas, text='5', command=lambda: self.controller.adicionar_numero('5'), **estilo_teclas_1)
         tecla_cinco.grid(column=1, row=2)
+        self._botoes_teclas_1.append(tecla_cinco)
 
-        tecla_seis = Button(frame_teclas, text='6', command=lambda: self.controller.adicionar_numero('6'), **estilo_teclas_1)
+        tecla_seis = Button(self._frame_teclas, text='6', command=lambda: self.controller.adicionar_numero('6'), **estilo_teclas_1)
         tecla_seis.grid(column=2, row=2)
+        self._botoes_teclas_1.append(tecla_seis)
 
-        tecla_subtracao = Button(frame_teclas, text='-', command=lambda: self.controller.adicionar_operador('-'), **estilo_teclas_2)
+        tecla_subtracao = Button(self._frame_teclas, text='-', command=lambda: self.controller.adicionar_operador('-'), **estilo_teclas_2)
         tecla_subtracao.grid(column=3, row=2)
+        self._botoes_teclas_2.append(tecla_subtracao)
 
         # 4ª linha de teclas
-        tecla_um = Button(frame_teclas, text='1', command=lambda: self.controller.adicionar_numero('1'), **estilo_teclas_1)
+        tecla_um = Button(self._frame_teclas, text='1', command=lambda: self.controller.adicionar_numero('1'), **estilo_teclas_1)
         tecla_um.grid(column=0, row=3)
+        self._botoes_teclas_1.append(tecla_um)
 
-        tecla_dois = Button(frame_teclas, text='2', command=lambda: self.controller.adicionar_numero('2'), **estilo_teclas_1)
+        tecla_dois = Button(self._frame_teclas, text='2', command=lambda: self.controller.adicionar_numero('2'), **estilo_teclas_1)
         tecla_dois.grid(column=1, row=3)
+        self._botoes_teclas_1.append(tecla_dois)
 
-        tecla_tres = Button(frame_teclas, text='3', command=lambda: self.controller.adicionar_numero('3'), **estilo_teclas_1)
+        tecla_tres = Button(self._frame_teclas, text='3', command=lambda: self.controller.adicionar_numero('3'), **estilo_teclas_1)
         tecla_tres.grid(column=2, row=3)
+        self._botoes_teclas_1.append(tecla_tres)
 
-        tecla_adicao = Button(frame_teclas, text='+', command=lambda: self.controller.adicionar_operador('+'), **estilo_teclas_2)
+        tecla_adicao = Button(self._frame_teclas, text='+', command=lambda: self.controller.adicionar_operador('+'), **estilo_teclas_2)
         tecla_adicao.grid(column=3, row=3)
+        self._botoes_teclas_2.append(tecla_adicao)
 
         # 5ª linha de teclas
         caminho_imagem = os.path.join(os.path.dirname(__file__), 'Recursos', 'coelhinho.png')
-        self._coelhinho_img = PhotoImage(file=caminho_imagem) # Pixel art bonitinha para preencher espaço vazio e decorar a calculadora
-        label_coelhinho = Label(frame_teclas, image=self._coelhinho_img, bg=cor_teclas1)
-        label_coelhinho.grid(column=0, row=4)
+        self._imagem = PhotoImage(file=caminho_imagem) # Pixel art bonitinha para preencher espaço vazio e decorar a calculadora
+        self._label_imagem = Label(self._frame_teclas, image=self._imagem, bg=cor_teclas1)
+        self._label_imagem.grid(column=0, row=4)
 
-        tecla_zero = Button(frame_teclas, text='0', command=lambda: self.controller.adicionar_numero('0'), **estilo_teclas_1)
+        tecla_zero = Button(self._frame_teclas, text='0', command=lambda: self.controller.adicionar_numero('0'), **estilo_teclas_1)
         tecla_zero.grid(column=1, row=4)
+        self._botoes_teclas_1.append(tecla_zero)
 
-        tecla_virgula = Button(frame_teclas, text=',', command=self.controller.adicionar_virgula, **estilo_teclas_1)
+        tecla_virgula = Button(self._frame_teclas, text=',', command=self.controller.adicionar_virgula, **estilo_teclas_1)
         tecla_virgula.grid(column=2, row=4)
+        self._botoes_teclas_1.append(tecla_virgula)
 
-        tecla_igual = Button(frame_teclas, text='=', command=self.controller.igual, **estilo_teclas_2)
+        tecla_igual = Button(self._frame_teclas, text='=', command=self.controller.igual, **estilo_teclas_2)
         tecla_igual.grid(column=3, row=4)
+        self._botoes_teclas_2.append(tecla_igual)
+
+        self.modo_xuxu = False
 
     def _iniciar_scroll(self): # Método para posicionar corretamente o Canvas e os widgets ao iniciar a Calculadora
         if self._canvas.winfo_width() <= 1: # Canvas ainda não criado
@@ -564,6 +590,65 @@ class CalculadoraView:
         else:
             self._painel_expressao.config(fg=cor_expressao)
 
+    def ativar_modo_xuxu(self):
+        global cor_fundo, cor_historico, cor_expressao, cor_resultado_parcial, cor_teclas1, cor_realce1, cor_teclas2, cor_realce2, cor_erro, cor_scrollbar
+
+        cor_fundo = '#e6e6fb'
+        cor_historico = '#9adcdc'
+        cor_expressao = '#375454'
+        cor_resultado_parcial = '#b1cbcb'
+        cor_teclas1 = '#c1c1d2'
+        cor_realce1 = '#424248'
+        cor_teclas2 = '#8484bb'
+        cor_realce2 = '#15154e'
+        cor_erro = '#73730f'
+        cor_scrollbar = cor_fundo
+        
+        def _atualizar_cores():
+            # Scrollbar
+            scrollbar_xuxu = ttk.Style()
+            scrollbar_xuxu.configure('Vertical.TScrollbar',
+                gripcount=0,
+                background=cor_scrollbar,
+                darkcolor=cor_teclas2,
+                lightcolor=cor_expressao,
+                troughcolor=cor_fundo,
+                bordercolor=cor_fundo,
+                arrowcolor=cor_expressao
+            )
+
+            scrollbar_xuxu.map('Vertical.TScrollbar',
+                background=[('active', cor_expressao)],
+                arrowcolor=[('active', cor_erro)]
+            )
+
+            # Canvas, Frame e espaçador
+            self._canvas.configure(bg=cor_fundo)
+            self._frame_painel.configure(bg=cor_fundo)
+            self._espacador_topo.configure(bg=cor_fundo)
+
+            # Labels
+            self._painel_historico.configure(bg=cor_fundo, fg=cor_historico)
+            self._painel_expressao.configure(bg=cor_fundo, fg=cor_expressao)
+            self._painel_resultado_parcial.configure(bg=cor_fundo, fg=cor_resultado_parcial)
+
+            # Teclas
+            self._frame_teclas.configure(bg=cor_teclas1)
+            # Atualiza botões de estilo 1
+            for botao in self._botoes_teclas_1:
+                botao.configure(bg=cor_teclas1, fg=cor_realce1)
+            # Atualiza botões de estilo 2
+            for botao in self._botoes_teclas_2:
+                botao.configure(bg=cor_teclas2, fg=cor_realce2)
+            
+            # Imagem
+            caminho_imagem_xuxu = os.path.join(os.path.dirname(__file__), 'Recursos', 'xuxu.png')
+            self._imagem = PhotoImage(file=caminho_imagem_xuxu)
+            self._label_imagem.configure(image=self._imagem, bg=cor_teclas1)
+        
+        _atualizar_cores()
+        self.modo_xuxu = True
+
     def iniciar_loop(self):
         self._janela.mainloop()
 
@@ -625,6 +710,8 @@ class CalculadoraController:
     
     def xuxu(self):
         self._model.xuxu()
+        if not self.view.modo_xuxu:
+            self.view.ativar_modo_xuxu()
         self._atualizar_expressao()
         self._atualizar_historico()
         self._atualizar_resultado_parcial()
