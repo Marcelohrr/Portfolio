@@ -42,7 +42,7 @@ getcontext().prec = 50
 
 # Função para a avaliação de expressões matemáticas
 def avaliar_expressao(expressao_str): # Recebe a string com a expressão matemática pronta para ser calculada
-    expressao_convertida_decimal = re.sub(r'(\d+(\.\d+)?|\.\d+)', r"Decimal('\1')", expressao_str) # sub(padrão, substituição, string) substitui strings de números por Decimal (\1 é um placeholder para o texto capturado pelo primeiro grupo da expressão regular) através dos padrões: 1. um ou mais dígitos (\d+), com ou sem parte decimal ((\.\d+)); ou (|) 2. um ou mais dígitos apenas com parte decimal (\.\d+)
+    expressao_convertida_decimal = re.sub(r'(\d+(\.\d+)?|\.\d+)', r'Decimal("\1")', expressao_str) # sub(padrão, substituição, string) substitui strings de números por Decimal (\1 é um placeholder para o texto capturado pelo primeiro grupo da expressão regular) através dos padrões: 1. um ou mais dígitos (\d+), com ou sem parte decimal ((\.\d+)); ou (|) 2. um ou mais dígitos apenas com parte decimal (\.\d+)
     return eval(expressao_convertida_decimal, {'Decimal': Decimal}) # eval executa a string expressao_convertida_decimal como código Python, com o dicionário de ambiente (namespace) definido para usar a classe Decimal a cada ocorrência de Decimal('...'), retornando o resultado como Decimal
 
 # Modelo: lógica interna
@@ -254,11 +254,11 @@ class CalculadoraView:
     def __init__(self, controller):
         self.controller = controller
         self._historico_formatado = [
-            "✦                  .                      ⋆  ",
-            "⋆               ✧       ·        ",
-            "•    ✷           ⋆          ",
-            "⋆                      .        ✦      ",
-            "·               ✧                        ⋆"
+            '✦                  .                      ⋆  ',
+            '⋆               ✧       ·        ',
+            '•    ✷           ⋆          ',
+            '⋆                      .        ✦      ',
+            '·               ✧                        ⋆'
         ]
 
         # 1. Criação e configuração da janela
@@ -501,11 +501,11 @@ class CalculadoraView:
     def atualizar_historico(self, historico, view_aproximado=False, view_nao_limpar=False):
         if not historico: # Se o histórico foi limpo no Model, limpa também o histórico no View
             self._historico_formatado = [
-                "✦                  .                      ⋆  ",
-                "⋆               ✧       ·        ",
-                "•    ✷           ⋆          ",
-                "⋆                      .        ✦      ",
-                "·               ✧                        ⋆"
+                '✦                  .                      ⋆  ',
+                '⋆               ✧       ·        ',
+                '•    ✷           ⋆          ',
+                '⋆                      .        ✦      ',
+                '·               ✧                        ⋆'
             ]
             self._painel_historico.config(text='\n'.join(self._historico_formatado))
             return
