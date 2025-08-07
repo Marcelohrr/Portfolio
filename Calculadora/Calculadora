@@ -307,7 +307,7 @@ class CalculadoraView:
             # Histórico
         self._painel_historico = Label(self._frame_painel, text='', font=('Arial', 18), bg=cor_fundo, fg=cor_historico, anchor='e', justify='right')
         self._painel_historico.pack(fill=X, pady=(10, 0), padx=10)
-        self._historico_formatado = []
+        self._historico_formatado = ['\n']
 
             # Expressão atual
         self._painel_expressao = Label(self._frame_painel, text='0', font=('Arial', 32, 'bold'), bg=cor_fundo, fg=cor_expressao, anchor='e', justify='right')
@@ -492,24 +492,23 @@ class CalculadoraView:
 
         self._janela.bind('<KeyPress>', _ao_digitar) # Os valores evento.keysym e evento.char funcionam de forma consistente no Tkinter em Windows, macOS e Linux
 
-    def atualizar_historico(self, historico, view_aproximado=False):
+    def atualizar_historico(self, historico, view_aproximado=False, view_nao_limpar=False):
         if not historico: # Se o histórico foi limpo no Model, limpa também o histórico no View
-            self._historico_formatado.clear()
-            self._painel_historico.config(text='')
+            self._historico_formatado = ['\n']
+            self._painel_historico.config(text='\n')
             return
-        if len(historico) == len(self._historico_formatado): # Se nada foi adicionado ao histórico, não faz nada
-            return
-        expressao, resultado = historico[-1]
-        expressao_formatada = self._inserir_separadores(expressao)
-        expressao_quebrada, _ = self._quebrar_em_linhas(expressao_formatada)
-        resultado_formatado = ''.join(self._inserir_separadores([resultado]))
-        if view_aproximado:
-            self._historico_formatado.append(f'{expressao_quebrada}\n≈ {resultado_formatado}')
-        else:
-            self._historico_formatado.append(f'{expressao_quebrada}\n= {resultado_formatado}')
-        exibicao_historico = '\n'.join(self._historico_formatado)
-        self._painel_historico.config(text=exibicao_historico)
-        self._ajustar_scroll()
+        if not view_nao_limpar:
+            expressao, resultado = historico[-1]
+            expressao_formatada = self._inserir_separadores(expressao)
+            expressao_quebrada, _ = self._quebrar_em_linhas(expressao_formatada)
+            resultado_formatado = ''.join(self._inserir_separadores([resultado]))
+            if view_aproximado:
+                self._historico_formatado.append(f'{expressao_quebrada}\n≈ {resultado_formatado}')
+            else:
+                self._historico_formatado.append(f'{expressao_quebrada}\n= {resultado_formatado}')
+            exibicao_historico = '\n'.join(self._historico_formatado)
+            self._painel_historico.config(text=exibicao_historico)
+            self._ajustar_scroll()
 
     def atualizar_expressao(self, expressao, view_mostrar_igual=False, view_aproximado=False):
         expressao_formatada = self._inserir_separadores(expressao)
@@ -660,8 +659,8 @@ class CalculadoraController:
         self._model = model
         self.view = view
     
-    def _atualizar_historico(self, controller_aproximado=False):
-        self.view.atualizar_historico(self._model.historico, view_aproximado=controller_aproximado)
+    def _atualizar_historico(self, controller_aproximado=False, controller_nao_limpar=False):
+        self.view.atualizar_historico(self._model.historico, view_aproximado=controller_aproximado, view_nao_limpar=controller_nao_limpar)
 
     def _atualizar_expressao(self, controller_mostrar_igual=False, controller_aproximado=False):
         self.view.atualizar_expressao(self._model.expressao, view_mostrar_igual=controller_mostrar_igual, view_aproximado=controller_aproximado)
@@ -702,7 +701,10 @@ class CalculadoraController:
     def limpar(self):
         self._model.limpar()
         self._atualizar_expressao()
-        self._atualizar_historico()
+        if self._model.expressao == ['0']:
+            self._atualizar_historico(controller_nao_limpar=True)
+        else:
+            self._atualizar_historico()
         self._atualizar_resultado_parcial()
 
     def apagar(self):

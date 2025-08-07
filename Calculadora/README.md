@@ -28,6 +28,6 @@ Feita em: 22/07-05/08/2025
 
 ---
 
-## 🛠️ Otimizações remanescentes identificadas
+## 🛠️ Otimização remanescente identificada
 
-- Corrigir bug visual de flutuação dos itens no painel (ao teclar =, ⌫ ou Clear)
+- Corrigir bug visual de flutuação dos itens no painel
