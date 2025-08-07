@@ -253,6 +253,13 @@ class CalculadoraView:
 
     def __init__(self, controller):
         self.controller = controller
+        self._historico_formatado = [
+            "✦                  .                      ⋆  ",
+            "⋆               ✧       ·        ",
+            "•    ✷           ⋆          ",
+            "⋆                      .        ✦      ",
+            "·               ✧                        ⋆"
+        ]
 
         # 1. Criação e configuração da janela
         self._janela = Tk()
@@ -305,9 +312,8 @@ class CalculadoraView:
 
         # Criação e configuração dos widgets no Frame painel (interno)
             # Histórico
-        self._painel_historico = Label(self._frame_painel, text='', font=('Arial', 18), bg=cor_fundo, fg=cor_historico, anchor='e', justify='right')
+        self._painel_historico = Label(self._frame_painel, text='\n'.join(self._historico_formatado), font=('Arial', 18), bg=cor_fundo, fg=cor_historico, anchor='e', justify='right')
         self._painel_historico.pack(fill=X, pady=(10, 0), padx=10)
-        self._historico_formatado = ['\n']
 
             # Expressão atual
         self._painel_expressao = Label(self._frame_painel, text='0', font=('Arial', 32, 'bold'), bg=cor_fundo, fg=cor_expressao, anchor='e', justify='right')
@@ -494,8 +500,14 @@ class CalculadoraView:
 
     def atualizar_historico(self, historico, view_aproximado=False, view_nao_limpar=False):
         if not historico: # Se o histórico foi limpo no Model, limpa também o histórico no View
-            self._historico_formatado = ['\n']
-            self._painel_historico.config(text='\n')
+            self._historico_formatado = [
+                "✦                  .                      ⋆  ",
+                "⋆               ✧       ·        ",
+                "•    ✷           ⋆          ",
+                "⋆                      .        ✦      ",
+                "·               ✧                        ⋆"
+            ]
+            self._painel_historico.config(text='\n'.join(self._historico_formatado))
             return
         if not view_nao_limpar:
             expressao, resultado = historico[-1]

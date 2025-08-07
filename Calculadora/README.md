@@ -24,10 +24,4 @@ Feita em: 22/07-05/08/2025
 ![Minha calculadora](Apresentação/calculadora_1.png)
 ![Tema alternativo](Apresentação/calculadora_2.png)
 
-*Demonstrações do tema padrão e do tema alternativo, com histórico e resultado parcial ativados*
-
----
-
-## 🛠️ Otimização remanescente identificada
-
-- Corrigir bug visual de flutuação dos itens no painel
+*Demonstrações do tema padrão e do tema alternativo*
