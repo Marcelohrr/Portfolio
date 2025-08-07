@@ -31,4 +31,3 @@ Feita em: 22/07-05/08/2025
 ## 🛠️ Otimizações remanescentes identificadas
 
 - Corrigir bug visual de flutuação dos itens no painel (ao teclar =, ⌫ ou Clear)
-- Corrigir falta de sinal negativo no histórico e resultado parcial em casos específicos de resultados negativos

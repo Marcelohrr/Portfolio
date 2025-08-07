@@ -552,8 +552,10 @@ class CalculadoraView:
                 parte_inteira, parte_decimal = token_virgula.split(',')
             else:
                 parte_inteira, parte_decimal = token_virgula, ''
-            parte_inteira_limpa = parte_inteira.replace('.', '')
-            parte_inteira_formatada = '{:,}'.format(int(parte_inteira_limpa)).replace(',', '.') # {} marcador de substituição
+            sinal = '-' if parte_inteira.startswith('-') else ''
+            parte_inteira_limpa = parte_inteira.lstrip('-').replace('.', '')
+            parte_inteira_formatada = '{:,}'.format(int(parte_inteira_limpa)).replace(',', '.')  # {} marcador de substituição
+            parte_inteira_formatada = sinal + parte_inteira_formatada # Garante preservação do sinal negativo
             numero_formatado = parte_inteira_formatada + (',' + parte_decimal if ',' in token_virgula else '')
             resultado_formatado.append(numero_formatado)
         return resultado_formatado
